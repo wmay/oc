@@ -1,0 +1,6 @@
+useDynLib(oc)
+export(oc,plot.OCcoords,plot.OCangles,plot.OCcutlines,plot.OCskree,plot.OCobject,summary.OCobject)
+import(pscl)
+
+S3method(plot,OCobject)
+S3method(summary,OCobject)

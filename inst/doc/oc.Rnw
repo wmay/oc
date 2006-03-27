@@ -1,0 +1,474 @@
+%\VignetteIndexEntry{An R Package for Optimal Classification}
+%\VignetteDepends{pscl}
+%\VignetteKeywords{multivariate}
+%\VignettePackage{oc}
+
+\documentclass[12pt]{article}
+\usepackage{Sweave}
+\usepackage{amsmath}
+\usepackage{amscd}
+
+\begin{document}
+
+\title{Using Poole's Optimal Classification in R} \maketitle
+
+\section{Introduction}
+
+This package estimates Poole's Optimal Classification scores from
+roll call votes supplied though a \verb@rollcall@ object from 
+package \verb@pscl@.\footnote{Production of this package is 
+supported by NSF Grant SES-0611974.} Optimal Classification fits a 
+Euclidean spatial model that places legislators in a specified 
+number of dimensions (usually one or two).  It maximizes the correct 
+classification of legislative choices, whereas W-NOMINATE maximizes 
+the probabilities of legislative choices given its error framework.  
+It also differs from W-NOMINATE because it is a non-parametric 
+procedure that requires no assumptions about the parametric form of 
+the legislators' preference functions, other than assuming that they 
+are symmetric and single--peaked.  However, legislator coordinates 
+recovered using OC are virtually identical to those recovered by 
+parametric procedures.
+
+The R version of Optimal Classification improves upon the earlier 
+software in three ways.  First, it is now considerably easier to 
+input new data for estimation, as the current software no longer 
+relies exclusively on the old \emph{ORD} file format for data input.  
+Secondly, roll call data can now be formatted and subsetted more 
+easily using R's data manipulation capabilities.  Finally, the 
+\verb@oc@ package includes a full suite of graphics functions to 
+analyze the results.
+
+This section briefly outlines the method by which OC scores are 
+calculated.  For a full description, readers are referred to 
+chapters 1 through 3 of Keith Poole's \emph{Spatial Models of 
+Parliamentary Voting.} and Poole's article in \emph{Political 
+Analysis} \cite{Poole1} \cite{Poole2}.
+
+We begin this discussion by considering how OC works in one
+dimension.  The one-dimensional optimal classification method can be
+summarized as follows:
+
+\begin{enumerate}
+    \item Generate a starting estimate of the legislator rank
+    ordering using singular value decomposition.
+    \item Holding the legislator rank ordering fixed, use the
+    \emph{Janice} algorithm (described below) to find the optimal cutting point ordering.
+    \item Holding the cutting point ordering fixed, use the
+    \emph{Janice} algorithm to find the optimal legislator ordering.
+    \item Return to step 2 to iterate if the results change from the
+    previous iteration
+\end{enumerate}
+
+Together, steps 2-4 constitute what is know as the \emph{Edith}
+algorithm.
+
+To understand the Janice algorithm, we provide a useful example.
+Suppose we have six legislators who vote on 5 roll calls as follows:\\
+
+\begin{center}
+\begin{tabular}{|c|c|c|c|c|c|}
+\hline
+Legislators&$1$&$2$&$3$&$4$&5\\
+\hline
+One & Y & Y & N & Y & Y\\
+Two & N & Y & Y & Y & Y\\
+Three & N & N & Y & Y & Y\\
+Four & N & N & N & Y & Y\\
+Five & N & N & N & N & Y\\
+Six & N & N & N & N & N\\
+\hline
+\end{tabular}
+\end{center}
+
+To recover the legislator ideal points $X_{1}$... $X_{6}$ with voting error, we
+generate an agreement score matrix and extract the first eigenvector
+from the double--centered agreement score matrix (not shown) as
+follows.  The result here transposes the ideal points of legislators
+$X_{1}$ and $X_{2}$, demonstrating how \emph{Janice} orders the legislator ideal points.\\
+
+\begin{center}
+\begin{tabular}{|c|c|c|c|c|c|}
+\hline
+%$Legislators$&Agreement Scores\\
+\multicolumn{6}{|c|}{Agreement Scores}\\
+\hline
+1 &  &  &  &  &\\
+.6 & 1 &  &  &  &\\
+.4 & .8 & 1 &  &  &\\
+.6 & .6 & .8 & 1 &  &\\
+.4 & .4 & .6 & .8 & 1.0 &\\
+.2 & .2 & .4 & .6 & .8 & 1.0\\
+\hline
+\end{tabular}\\
+
+\begin{tabular}{|c|}
+\hline
+First Eigenvector\\
+\hline
+$X_{1} = -.44512$\\
+$X_{2} = -.48973$\\
+$X_{3} = -.11093$\\
+$X_{4} = .04431$\\
+$X_{5} = .34859$\\
+$X_{6} = .65288$\\
+\hline
+\end{tabular}
+\end{center}
+
+To see how \emph{Janice} chooses the cutting lines to minimize the number of classification errors, we first observe that the ideal points of the legislators are ordered such that $X_{2} < X_{1} < X_{3} < X_{4} < X_{5} < X_{6}$.  From this ordering, we take the predicted votes conditional on the \emph{j}th cutline $z_{j}$ as follows, and simply measure the actual number of errors on the roll calls.  In this example, we show only a table with Yeas on the Left and Nays on the Right; however, this procedure is usually also repeated with a table where Yeas are on the Right and Nays are on the Left.
+
+\begin{center}
+\begin{tabular}{|c|c|c|}
+\hline
+Cutline placement & Predicted Vote & Errors on Roll calls \\
+&&1 2 3 4 5\\
+\hline
+$Z_{j} < X_{2}$ & N N N N N N & 1 2 2 4 5\\
+$X_{2} < Z_{j} < X_{1}$ & Y N N N N N & 2 1 1 3 4\\
+$X_{1} < Z_{j} < X_{3}$ & Y Y N N N N & \textbf{\underline{1}} \textbf{\underline{0}} 2 2 3\\
+$X_{3} < Z_{j} < X_{4}$ & Y Y Y N N N & 2 1 \textbf{\underline{1}} 1 2\\
+$X_{4} < Z_{j} < X_{5}$ & Y Y Y Y N N & 3 2 2 \textbf{\underline{0}} 1\\
+$X_{5} < Z_{j} < X_{6}$ & Y Y Y Y Y N & 4 3 3 1 \textbf{\underline{0}}\\
+$X_{6} < Z_{j}$ & Y Y Y Y Y Y & 5 4 4 2 1\\
+\hline
+\end{tabular}
+\end{center}
+
+The underlined placements of the five roll call cutlines thus minimize the number of classification errors in this example, and the application of the \emph{Janice} algorithm produces the following joint ordering of legislators and cutting points:
+
+\begin{center}
+$X_{1} < X_{2} < Z_{1} = Z_{2} < X_{3} < Z_{3} < X_{4} < Z_{4} < X_{5} < Z_{5} < X_{6}$
+\end{center}
+
+In multiple dimensions, OC shares the same core algorithm as its single-dimension counterpart.  The major difference in multiple dimensions is that cutting lines can no longer be tested exhaustively as in the one-dimensional case.  Instead, the optimal cutting lines $N_{j}$ for a roll call matrix with $p$ legislators, $s$ roll calls, and $d$ dimensions are derived through projection onto a least squares line as follows:
+
+\begin{enumerate}
+ \item Obtain a starting estimate of $N_{j}$, usually through least squares regression.
+ \item Calculate the correct classifications associated with $N_{j}$.
+ \item Construct $\Psi^{*}$, where:
+  \begin{itemize}
+   \item $\Psi_{i} = X_{i} + (c_{j} - w_{i})N_{j}$ if correctly classified and $\Psi_{i} = X_{i}$ if incorrectly classified. $\Psi_{i}$ is the $s x 1$ vector that is the $i$th row of $\Psi$, $X_{i}$ is the ideal point of legislator i, $c_{j}$ is the midpoint of roll call $j$, and $w_{i} = X_{i}'N_{j}$.
+   \item $\Psi^{*}$ = $\Psi$ - $J_{p}u'$, where $J_{p}$ is a $p x 1$ vector of 1s and $u$ is a $d x 1$ vector of means.
+  \end{itemize}
+ \item Perform the singular value decomposition $U\Lambda V'$ of $\Psi^{*}$.
+ \item Use the \emph{s}th singular vector (\emph{s}th column) $v_{s}$ of $V$ as the new estimate of $N_{j}$.
+
+\end{enumerate}
+
+The starting value generator, cutting line algorithm, and legislator ordering algorithm collectively consitute the OC algorithm that is implemented in this R package.
+
+\section{Usage Overview}
+
+The \verb@oc@ package was designed for use in one of three
+ways.  First, users can estimate ideal points from a set of
+Congressional roll call votes stored in the traditional \emph{ORD}
+file format.  Secondly, users can generate a vote matrix of their
+own, and feed it directly into \verb@oc@ for analysis.
+Finally, users can also generate test data with ideal points and
+bill parameters arbitrarily specified as arguments by the user for
+analysis with \verb@oc@. Each of these cases are supported
+by a similar sequence of function calls, as shown in the diagrams
+below:
+
+\begin{flushleft}
+$
+\begin{CD}
+\texttt{\emph{ORD} file}
+   @>\texttt{readKH()}>>
+   \texttt{\emph{rollcall} object}
+   @>\texttt{oc()}>>
+   \texttt{\emph{OCobject}}
+\end{CD}
+$
+$
+\begin{CD}
+   \texttt{Vote matrix}
+   @>\texttt{rollcall()}>>
+   \texttt{\emph{rollcall} object}
+   @>\texttt{oc()}>>
+   \texttt{\emph{OCobject}}
+\end{CD}
+$
+\end{flushleft}
+
+Following generation of an \verb@OCobject@, the user then
+analyzes the results using the \emph{plot} and \emph{summary} methods,
+including:
+
+\begin{itemize}
+\item \textbf{plot.OCcoords()}: Plots ideal points in one or two dimensions.
+\item \textbf{plot.OCangles()}: Plots a histogram of cut lines.
+\item \textbf{plot.OCcutlines()}: Plots a specified percentage of cutlines (a Coombs mesh).
+\item \textbf{plot.OCskree()}: Plots a Skree plot with the first 20 eigenvalues.
+\item \textbf{plot.OCobject()}: S3 method for an \verb@OCobject@ that combines the four plots described above.
+\item \textbf{summary.OCobject()}: S3 method for an \verb@OCobject@ 
+that summarizes the estimates.
+\end{itemize}
+
+Examples of each of the three cases described here are presented
+in the following sections.
+
+\section{Optimal Classification with ORD files}
+
+This is the use case that the majority of \verb@oc@ users
+are likely to fall into.  Roll call votes in a fixed width format
+\emph{ORD} format for all U.S. Congresses are stored online for
+download at:
+
+\begin{itemize}
+\item \emph{http://www.voteview.com/} \item
+\emph{http://www.polisci.ucla.edu/faculty/lewis/rollcall/} (latest Congress
+only, updates votes in real time)
+\end{itemize}
+
+\verb@oc@ takes \verb@rollcall@ objects from Simon Jackman's
+\verb@pscl@ package as input. The package includes a function,
+\emph{readKH()}, that takes an \emph{ORD} file and automatically
+transforms it into a \verb@rollcall@ object as desired. Refer to
+the documentation in \verb@pscl@ for more detailed information on
+\emph{readKH()} and \emph{rollcall()}.  Using the 90th Senate as
+an example, we can download the file \emph{sen90kh.ord} and read
+the data in R as follows:\\
+
+<<one>>=
+library(oc)
+#sen90 <- readKH("ftp://voteview.com/sen90kh.ord")
+data(sen90)     #Does same thing as above
+sen90
+@
+
+To make this example more interesting, suppose we were interested
+in applying \emph{oc()} only to bills that pertained in some
+way to agriculture.  Keith Poole and Howard Rosenthal's VOTEVIEW software allows us to
+quickly determine which bills in the 90th Senate pertain to
+agriculture.\footnote{VOTEVIEW for Windows can be downloaded at \emph{www.voteview.com}.}
+Using this information, we create a vector of roll calls that we wish
+to select, then select for them in the \verb@rollcall@ object.  In doing
+so, we should also take care to update the variable in the \verb@rollcall@
+object that counts the total number of bills, as follows:
+
+<<oneandhalf>>=
+selector <- c(21,22,44,45,46,47,48,49,50,53,54,55,56,58,59,60,61,62,65,66,67,68,69,70,71,72,73,74,75,77,78,80,81,82,83,84,87,99,100,101,105,118,119,120,128,129,130,131,132,133,134,135,141,142,143,144,145,147,149,151,204,209,211,218,219,220,221,222,223,224,225,226,227,228,229,237,238,239,252,253,257,260,261,265,266,268,269,270,276,281,290,292,293,294,295,296,302,309,319,321,322,323,324,325,327,330,331,332,333,335,336,337,339,340,346,347,357,359,367,375,377,378,379,381,384,386,392,393,394,405,406,410,418,427,437,442,443,444,448,449,450,454,455,456,459,460,461,464,465,467,481,487,489,490,491,492,493,495,497,501,502,503,504,505,506,507,514,515,522,523,529,539,540,541,542,543,544,546,548,549,550,551,552,553,554,555,556,557,558,559,560,561,562,565,566,567,568,569,571,584,585,586,589,590,592,593,594,595)
+
+sen90$m <- length(selector)
+sen90$votes <- sen90$votes[,selector]
+@
+
+\emph{oc()} takes a number of arguments described fully in
+the documentation. Most of the arguments can (and probably should)
+be left at their defaults, particularly when estimating ideal
+points from U.S. Congresses.  The default options estimate ideal
+points in two dimensions without standard errors, using the same
+beta and weight parameters as described in the introduction. Votes
+where the losing side has less than 2.5 per cent of the vote, and
+legislators who vote less than 20 times are excluded from
+analysis.
+
+The most important argument that \emph{oc()} requires is a
+set of legislators who have positive ideal points in each
+dimension. This is the \emph{polarity} argument to \emph{oc()}.
+In two dimensions, this might mean a fiscally conservative legislator
+on the first dimension, and a socially conservative legislator on the
+second dimension. Polarity can be set in a number of ways, such as a
+vector of row indices (the recommended method), a
+vector of names, or by any arbitrary column in the
+\emph{legis.data} element of the \verb@rollcall@ object.  Here, we
+use Senators Sparkman and Bartlett to set the polarity for the
+estimation.  The names of the first 12 legislators are shown, and we
+can see that Sparkman and Bartlett are the second and fifth
+legislators respectively.
+
+<<two>>=
+rownames(sen90$votes)[1:12]
+result <- oc(sen90, polarity=c(2,5))
+@
+
+\verb@result@ now contains all of the information from the
+OC estimation, the details of which are fully described in
+the documentation for \emph{oc()}.
+\verb@result$legislators@ contains all of the information from the
+\verb@PERF25.DAT@ file from the old Fortran \emph{oc()},
+while \verb@result$rollcalls@ contains all of the information from
+the old \verb@PERF21.DAT@ file.  The information can be browsed
+using the \emph{fix()} command as follows (not run):\\
+
+\noindent
+> \emph{legisdata <- result\$legislators}\\
+> \emph{fix(legisdata)}\\
+
+For those interested in just the ideal points, a much better way
+to do this is to use the \emph{summary()} function:
+
+<<three>>=
+summary(result)
+@
+
+\verb@result@ can also be plotted, with a basic summary plot
+achieved as follows as shown Figure 1:
+
+\begin{figure}
+\begin{center}
+<<label=four,fig=TRUE,echo=TRUE>>=
+plot(result)
+@
+\end{center}
+\caption{Summary Plot of 90th Senate Agriculture Bill OC Scores}
+\label{fig:one}
+\end{figure}
+
+This basic plot splits the window into 4 parts and calls
+\emph{plot.OCcoords()}, \emph{plot.OCangles()}, \emph{plot.OCskree()},
+and \emph{plot.OCcutlines()} sequentially.  Each of these four
+functions can be called individually.  In this example, the
+coordinate plot on the top left plots each legislator with their
+party affiliation. A unit circle is included to illustrate how
+OC scores are constrained to lie within a unit circle.
+Observe that with agriculture votes, party affiliation does not
+appear to be a strong predictor on the first dimension, although
+the second dimension is largely divided by party line. The skree plot shows the first 20
+eigenvalues, and the rapid decline after the second eigenvalue suggests
+that a two-dimensional model describes the voting behavior of the 90th
+Senate well.  The final plot shows 50 random cutlines, and can be
+modified to show any desired number of cutlines as necessary.
+
+Three things should be noted about the use of the \emph{plot()}
+functions. First, the functions always plot the results from the
+first two dimensions, but the dimensions used (as well as titles
+and subheadings) can all be changed by the user if, for example,
+they wish to plot dimensions 2 and 3 instead.  Secondly, plots of
+one dimensional \verb@oc@ objects work somewhat differently
+than in two dimensions and are covered in the example in the final section.  Finally,
+\emph{plot.OCcoords()} can be modified to include cutlines from
+whichever votes the user desires.  The cutline of the 14th 
+agricultural vote (corresponding to the 58th actual vote)
+from the 90th Senate with ideal points is plotted below in Figure
+2, showing that the vote largely broke down along partisan
+lines.
+
+\begin{figure}
+\begin{center}
+<<label=five,fig=TRUE,echo=TRUE>>=
+par(mfrow=c(1,1))
+plot.OCcoords(result,cutline=14)
+@
+\end{center}
+\caption{90th Senate Agriculture Bill OC Scores with Cutline}
+\label{fig:two}
+\end{figure}
+
+\section{Optimal Classification with arbitrary vote matrix}
+
+This section describes an example of OC being used for
+roll call data not already in \emph{ORD} format.  The example here
+is drawn from the first three sessions of the United Nations,
+discussed further as Figure 5.8 in Keith Poole's \emph{Spatial
+Models of Parliamentary Voting} \cite{Poole1}.
+
+To create a \verb@rollcall@ object for use with \emph{oc()},
+one ideally should have three things:
+
+\begin{itemize}
+\item A matrix of votes from some source. The matrix should be
+arranged as a \textit{legislators} x \textit{votes} matrix.  It
+need not be in 1/6/9 or 1/0/NA format, but users must be able to
+distinguish between Yea, Nay, and missing votes.
+
+\item A vector of names for each member in the vote matrix.
+
+\item OPTIONAL: A vector describing the party or party-like
+memberships for the legislator.
+
+\end{itemize}
+
+The \verb@oc@ package includes all three of these items for
+the United Nations, which can be loaded and browsed with the code 
+shown below.  The data comes from Eric Voeten at George Washington University. 
+In practice, one would prepare a roll call data set in a spreadsheet, like the
+one available one \emph{www.voteview.com/UN.csv}, and read it into R using \emph{read.csv()}.
+The csv file is also stored in this package and can be read using:\\
+
+\noindent 
+\emph{UN<-read.csv(``library/oc/data/UN.csv'',header=FALSE,strip.white=TRUE) }\\
+
+
+The line above reads the exact same data as what is stored in this
+package as R data, which can be obtained using the following commands:
+
+<<UN1>>=
+rm(list=ls(all=TRUE))
+data(UN)
+UN<-as.matrix(UN)
+UN[1:5,1:6]
+@
+
+Observe that the first column are the names of the legislators
+(in this case, countries), and the second column lists whether a
+country is a ``Warsaw Pact'' country or ``Other'', which in this case can
+be thought of as a `party' variable.  All other observations are votes.
+Our objective here is to use this data to create a \verb@rollcall@ object
+through the \emph{rollcall} function in \verb@pscl@.  The object can then
+be used with \emph{oc()} and its plot/summary functions as in the
+previous \emph{ORD} example.
+
+To do this, we want to extract a vector of names (\emph{UNnames}) and party
+memberships (\emph{party}), then delete them from the original matrix so we
+have a matrix of nothing but votes. The \emph{party} variable must be rolled
+into a matrix as well for inclusion in the \verb@rollcall@ object as
+follows:
+
+<<UN2>>=
+UNnames<-UN[,1]
+legData<-matrix(UN[,2],length(UN[,2]),1)
+colnames(legData)<-"party"
+UN<-UN[,-c(1,2)]
+@
+
+In this particular vote matrix, Yeas are numbered 1, 2, and 3, Nays are
+4, 5, and 6, abstentions are 7, 8, and 9, and 0s are missing.  Other vote
+matrices are likely different so the call to \emph{rollcall} will be slightly
+different depending on how votes are coded.  Party identification is included
+in the function call through \verb@legData@, and a \verb@rollcall@ object is
+generated and applied to OC as follows.  A one dimensional OC model is fitted, and result is summarized below
+and plotted in Figure 3:
+
+<<UN3>>=
+rc <- rollcall(UN, yea=c(1,2,3), nay=c(4,5,6),
+missing=c(7,8,9),notInLegis=0, legis.names=UNnames,
+legis.data=legData,
+desc="UN Votes",
+source="www.voteview.com")
+result<-oc(rc,polarity=1,dims=1)
+@
+
+<<UN5>>=
+summary(result)
+@
+
+\begin{figure}
+\begin{center}
+<<label=UN4,fig=TRUE,echo=TRUE>>=
+plot(result)
+@
+\end{center}
+\caption{Summary Plot of UN Data}
+\label{fig:three}
+\end{figure}
+
+Note that the one dimensional plot differs considerably from the previous two dimensional
+plots, since only a coordinate plot and a Skree plot are shown.  This is because in one
+dimension, all cutlines are angled at 90$^\circ$, so there is no need to plot either the
+cutlines or a histogram of cutline angles.  Also, the plot appears to be compressed,
+so users need to expand the image manually by using their mouse and dragging along
+the corner of the plot to expand it.
+
+\newpage
+\begin{thebibliography}{2}
+
+\bibitem{Poole1} Poole, Keith (2000) ``Non-Parametric Unfolding of Binary Choice Data.'' \emph{Political Analysis} 8: 211-237.
+
+\bibitem{Poole2} Poole, Keith (2005) \emph{Spatial Models of Parliamentary Voting.}
+Cambridge: Cambridge University Press.
+
+\end{thebibliography}
+
+\end{document}
