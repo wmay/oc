@@ -430,17 +430,19 @@
                CLASSIFY((I-1)*4 + 2)=CLASSIFY((I-1)*4 + 2)+1
             ENDIF
          ENDIF
-         IF(ZPT(J).GT.XXX(I).AND.ZPT(J).LT.XXX(I+1))THEN
-            ZDOWN=YRANK(I)
-            ZUP=YRANK(I+1)
-         ENDIF
          IF(ZPT(J).LT.XXX(1))THEN
             ZDOWN=YRANK(1)
             ZUP=YRANK(1)
+            go to 812
          ENDIF
          IF(ZPT(J).GT.XXX(NP))THEN
             ZDOWN=YRANK(NP)
             ZUP=YRANK(NP)
+            go to 812
+         ENDIF
+         IF(ZPT(J).GT.XXX(I).AND.ZPT(J).LT.XXX(I+1))THEN
+            ZDOWN=YRANK(I)
+            ZUP=YRANK(I+1)
          ENDIF
   812    CONTINUE
          KTSUM=KTSUM+KSUM
