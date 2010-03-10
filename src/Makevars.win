@@ -1,2 +1,2 @@
-PKG_FCFLAGS=$(SAFE_FFLAGS) -fdefault-real-8 --float-store -fmax-stack-var-size=8
+PKG_FCFLAGS=$(SAFE_FFLAGS) -Wall -fdefault-real-8 --float-store -fmax-stack-var-size=8
 PKG_LIBS = $(LAPACK_LIBS) $(BLAS_LIBS)
