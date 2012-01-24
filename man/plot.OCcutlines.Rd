@@ -11,9 +11,9 @@
 }
 
 \usage{         
-plot.OCcutlines(x, main.title="Cutting Lines",
+\method{plot}{OCcutlines}(x, main.title="Cutting Lines",
         d1.title="First Dimension", d2.title="Second Dimension",
-        lines=50,dims=c(1,2),lwd=2,...)
+        lines=50,dims=c(1,2),lwd=2,\ldots)
 }
 
 \arguments{
@@ -33,11 +33,11 @@ plot.OCcutlines(x, main.title="Cutting Lines",
 }
 
 \author{ 
-Keith Poole \email{kpoole@ucsd.edu}
+Keith Poole \email{kpoole@uga.edu}
 
 Jeffrey Lewis \email{jblewis@ucla.edu}
 
-James Lo \email{jameslo@ucla.edu}
+James Lo \email{lo@uni-mannheim.de}
 
 Royce Carroll \email{rcarroll@ucsd.edu}
 }

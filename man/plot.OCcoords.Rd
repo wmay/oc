@@ -12,10 +12,10 @@
 }
 
 \usage{
-plot.OCcoords(x, main.title="OC Coordinates",
+\method{plot}{OCcoords}(x, main.title="OC Coordinates",
     d1.title="First Dimension", d2.title="Second Dimension", dims=c(1,2),
     plotBy="party", color=TRUE, shape=TRUE, cutline=NULL, Legend=TRUE,
-    legend.x=0.8, legend.y=1, ...)            
+    legend.x=0.8, legend.y=1,\ldots) 
 }
 
 \arguments{
@@ -42,11 +42,11 @@ plot.OCcoords(x, main.title="OC Coordinates",
 }
 
 \author{ 
-Keith Poole \email{kpoole@ucsd.edu}
+Keith Poole \email{kpoole@uga.edu}
 
 Jeffrey Lewis \email{jblewis@ucla.edu}
 
-James Lo \email{jameslo@ucla.edu}
+James Lo \email{lo@uni-mannheim.de}
 
 Royce Carroll \email{rcarroll@ucsd.edu}
 }

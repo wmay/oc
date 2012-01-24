@@ -33,11 +33,11 @@ data(UN)
 }
 
 \author{ 
-Keith Poole \email{kpoole@ucsd.edu}
+Keith Poole \email{kpoole@uga.edu}
 
 Jeffrey Lewis \email{jblewis@ucla.edu}
 
-James Lo \email{jameslo@ucla.edu}
+James Lo \email{lo@uni-mannheim.de}
 
 Royce Carroll \email{rcarroll@ucsd.edu}
 }

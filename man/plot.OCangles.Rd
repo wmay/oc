@@ -8,10 +8,9 @@
 }
 
 \usage{
-plot.OCangles(x, main.title="Cutting Line Angles",
+\method{plot}{OCangles}(x, main.title="Cutting Line Angles",
         x.title="Angle in Degrees", y.title="Count",
-        dims=c(1,2),...)
-
+        dims=c(1,2),\ldots)
 }
 
 \arguments{
@@ -28,11 +27,11 @@ plot.OCangles(x, main.title="Cutting Line Angles",
 }
 
 \author{ 
-Keith Poole \email{kpoole@ucsd.edu}
+Keith Poole \email{kpoole@uga.edu}
 
 Jeffrey Lewis \email{jblewis@ucla.edu}
 
-James Lo \email{jameslo@ucla.edu}
+James Lo \email{lo@uni-mannheim.de}
 
 Royce Carroll \email{rcarroll@ucsd.edu}
 }

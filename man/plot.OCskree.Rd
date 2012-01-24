@@ -8,8 +8,8 @@
 }
 
 \usage{
-plot.OCskree(x, main.title="Skree Plot", x.title="Dimension",
-        y.title="Eigenvalue",...)
+\method{plot}{OCskree}(x, main.title="Skree Plot", x.title="Dimension",
+        y.title="Eigenvalue",\ldots)
 }
 
 \arguments{
@@ -25,11 +25,11 @@ plot.OCskree(x, main.title="Skree Plot", x.title="Dimension",
 }
 
 \author{ 
-Keith Poole \email{kpoole@ucsd.edu}
+Keith Poole \email{kpoole@uga.edu}
 
 Jeffrey Lewis \email{jblewis@ucla.edu}
 
-James Lo \email{jameslo@ucla.edu}
+James Lo \email{lo@uni-mannheim.de}
 
 Royce Carroll \email{rcarroll@ucsd.edu}
 }

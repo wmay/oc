@@ -6,7 +6,7 @@
 }
 
 \usage{
-summary.OCobject(object,verbose=FALSE,...)              
+\method{summary}{OCobject}(object,verbose=FALSE,...)              
 }
 
 \arguments{
@@ -21,11 +21,11 @@ summary.OCobject(object,verbose=FALSE,...)
 }
 
 \author{ 
-Keith Poole \email{kpoole@ucsd.edu}
+Keith Poole \email{kpoole@uga.edu}
 
 Jeffrey Lewis \email{jblewis@ucla.edu}
 
-James Lo \email{jameslo@ucla.edu}
+James Lo \email{lo@uni-mannheim.de}
 
 Royce Carroll \email{rcarroll@ucsd.edu}
 }
