@@ -1,6 +1,6 @@
-.First.lib <- function(lib,pkg) {
-   library.dynam("oc",pkg,lib)
-}
+#.First.lib <- function(lib,pkg) {
+#   library.dynam("oc",pkg,lib)
+#}
 
 
 ###################################################################################

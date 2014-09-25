@@ -7,7 +7,7 @@
 }
 
 \usage{
-oc(rcObject, dims=2, minvotes=20, lop=0.025, polarity, verbose=FALSE)                      
+oc(rcObject, dims=2, minvotes=20, lop=0.025, polarity, verbose=FALSE)
 }
 
 \arguments{
@@ -80,13 +80,13 @@ oc(rcObject, dims=2, minvotes=20, lop=0.025, polarity, verbose=FALSE)
 }
 
 \author{ 
-Keith Poole \email{kpoole@uga.edu}
+Keith Poole \email{ktpoole@uga.edu}
 
 Jeffrey Lewis \email{jblewis@ucla.edu}
 
-James Lo \email{lo@uni-mannheim.de}
+James Lo \email{jameslo@princeton.edu}
 
-Royce Carroll \email{rcarroll@ucsd.edu}
+Royce Carroll \email{rcarroll@rice.edu}
 }
 
 \references{
@@ -109,11 +109,13 @@ Keith Poole. \url{ http://voteview.ucsd.edu/ }
     #sen90 <- readKH("ftp://voteview.com/sen90kh.ord")
     #All ORD files can be found on www.voteview.com
     data(sen90)
-    
     summary(sen90)
-    result<-oc(sen90,dims=2,polarity=c(7,2))
-    summary(result)
-    plot(result) 
+
+    #Output file identical to one produced by command below
+    #sen90oc <-oc(sen90,dims=2,polarity=c(7,2))
+    data(sen90oc)
+    summary(sen90oc)
+    plot(sen90oc) 
 
 }
 \keyword{ multivariate }

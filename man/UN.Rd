@@ -33,13 +33,13 @@ data(UN)
 }
 
 \author{ 
-Keith Poole \email{kpoole@uga.edu}
+Keith Poole \email{ktpoole@uga.edu}
 
 Jeffrey Lewis \email{jblewis@ucla.edu}
 
-James Lo \email{lo@uni-mannheim.de}
+James Lo \email{jameslo@princeton.edu}
 
-Royce Carroll \email{rcarroll@ucsd.edu}
+Royce Carroll \email{rcarroll@rice.edu}
 }
 
 \seealso{
@@ -66,9 +66,10 @@ legis.data=legData,
 desc="UN Votes",
 source="www.voteview.com")
 
-result<-oc(rc,polarity=1,dims=1)
-plot(result)
-summary(result)
+# Not Run
+# result<-oc(rc,polarity=1,dims=1)
+# plot(result)
+# summary(result)
 }
 
 \keyword{datasets}

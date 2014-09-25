@@ -1,0 +1,23 @@
+
+0.8	* Unusual polarity issues fixed
+
+0.9     * HISTORY file added
+        * Changes to fix issues with big matrix adapted
+
+0.92	* Fixes mostly to comply with 2.14.1 R CMD CHECK
+	* .onAttach() no longer calls require or uses cat()
+	* INTEGER(8) to REAL(8) memory leak fixed
+	* Rd documentation files now call \method markup, not full name
+	* Note that the mini-plot functions, like plot.OCangles(), are not really S3 functions. The alternative was to use underscore instead of '.' in file name
+	* Made a deliberate decision to cast them as S3 to maintain backward compatibility
+	* Affiliations updated to represent current institutions
+	* STOP statements taken out to remove compilation note
+	* Extra graphic files deleted from inst/doc
+	* PKG_FCFLAGS=$(SAFE_FFLAGS) -Wall -fdefault-real-8 --float-store -fmax-stack-var-size=8 deleted from Makevars.win 
+
+0.95	* Updated all author institutional affiliations
+	* Vignette moved to vignettes directory for R 3.1 compliance
+	* .First.Lib use eliminated for R 3.1 compliance
+	* HISTORY file renamed ChangeLog
+	* Truncated Rd ddocumentation to not overrun PDF
+	* Used a saved sen90oc file to reduce runtime on test examples
