@@ -84,7 +84,7 @@ Keith Poole \email{ktpoole@uga.edu}
 
 Jeffrey Lewis \email{jblewis@ucla.edu}
 
-James Lo \email{jameslo@princeton.edu}
+James Lo \email{lojames@usc.edu}
 
 Royce Carroll \email{rcarroll@rice.edu}
 }
@@ -96,7 +96,7 @@ Analysis, 8(3):211-237
 Keith Poole. 2005. 'Spatial Models of Parliamentary Voting.' Cambridge:
 Cambridge University Press.
 
-Keith Poole. \url{ http://voteview.ucsd.edu/ }
+Keith Poole. \url{ http://voteview.com/ }
 
 }
 

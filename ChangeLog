@@ -21,3 +21,10 @@
 	* HISTORY file renamed ChangeLog
 	* Truncated Rd ddocumentation to not overrun PDF
 	* Used a saved sen90oc file to reduce runtime on test examples
+
+0.96  * Maintainer changed from jameslo@princeton.edu to lojames@usc.edu
+	  * Period removed from title
+	  * importFrom() and S3 statements added to NAMESPACE
+
+
+

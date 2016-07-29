@@ -1,6 +1,17 @@
 useDynLib(oc)
 export(oc,plot.OCcoords,plot.OCangles,plot.OCcutlines,plot.OCskree,plot.OCobject,summary.OCobject)
+
 import(pscl)
 
+importFrom("grDevices", "colors")
+importFrom("graphics", "hist", "legend", "lines", "par", "plot", "points", "symbols")
+importFrom("stats", "na.omit")
+importFrom("utils", "flush.console")
+     
 S3method(plot,OCobject)
 S3method(summary,OCobject)
+
+S3method(plot,OCangles)
+S3method(plot,OCcoords)
+S3method(plot,OCcutlines)
+S3method(plot,OCskree)
