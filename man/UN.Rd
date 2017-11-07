@@ -29,7 +29,7 @@ data(UN)
 
 \source{
   Keith Poole. 2005. \emph{UN Vote Data}.
-  \url{http://www.voteview.com/}.
+  \url{https://legacy.voteview.com/}.
 }
 
 \author{ 
@@ -48,8 +48,10 @@ Royce Carroll \email{rcarroll@rice.edu}
 
 \examples{
 #The same data set can be obtained from downloading the UN.csv
-#file from www.voteview.com and reading it as follows:
-#UN<-read.csv("C:/UN.csv",header=FALSE,strip.white=TRUE)
+#file from legacy.voteview.com and reading it as follows:
+\dontrun{
+UN<-read.csv("UN.csv",header=FALSE,strip.white=TRUE)
+}
 
 data(UN)
 UN<-as.matrix(UN)
@@ -67,9 +69,12 @@ desc="UN Votes",
 source="www.voteview.com")
 
 # Not Run
-# result<-oc(rc,polarity=1,dims=1)
-# plot(result)
-# summary(result)
+\dontrun{
+result<-oc(rc,polarity=1,dims=1)
+plot(result)
+summary(result)
+}
+
 }
 
 \keyword{datasets}

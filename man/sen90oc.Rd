@@ -61,8 +61,8 @@ data(sen90oc)
 }
 
 \source{
-  Keith Poole. 2005. \emph{90th Senate Roll Call Vote Data}.
-  \url{http://www.voteview.com/}.
+  Voteview Team. 2017. \emph{90th Senate Roll Call Vote Data}.
+  \url{https://voteview.com/static/data/out/votes/S090_votes.ord}.
 }
 
 \author{ 
@@ -82,8 +82,10 @@ Royce Carroll \email{rcarroll@rice.edu}
 
 \examples{
     #This data file is the same as that obtained using:
-    #data(sen90)
-    #sen90oc<-oc(sen90,dims=2,polarity=c(7,2)) 
+    \dontrun{
+    data(sen90)
+    sen90oc <- oc(sen90,dims=2,polarity=c(7,2)) 
+	}
 
     data(sen90oc)
     summary(sen90oc)

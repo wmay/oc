@@ -1,0 +1,5169 @@
+!  &&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+!  &&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+!
+!    rcmd build  --binary --no-vignettes oc
+!
+      
+!        IMPLICIT INTEGER(I-N)
+!        IMPLICIT DOUBLE PRECISION(A-H,O-Z)
+        SUBROUTINE OC(VOTES,NUMMEMBERS,NUMVOTES,DIMS,       &
+          POLARITY,CLASSIFY,FITS,VOLUME,                       &
+          IDEALPOINTS,MIDPOINTS,NORMALVECTORS,EIGENVALUES,     &
+          EXITSTATUS)
+!
+        IMPLICIT DOUBLE PRECISION(A-H,O-Z)
+        IMPLICIT INTEGER(I-N)
+        INTEGER VOTES(NUMMEMBERS*NUMVOTES),DIMS,POLARITY(DIMS), &
+                EXITSTATUS
+        DOUBLE PRECISION EIGENVALUES(NUMMEMBERS), &
+                CLASSIFY((NUMMEMBERS+NUMVOTES)*4), &
+                FITS(2),MIDPOINTS(NUMVOTES), &
+                NORMALVECTORS(NUMVOTES*DIMS), &
+                IDEALPOINTS(NUMMEMBERS*DIMS),VOLUME(NUMMEMBERS)
+      DOUBLE PRECISION:: ZUP=0.0,ZDOWN=0.0
+!
+      INTEGER, ALLOCATABLE :: LDATA(:,:)
+      INTEGER, ALLOCATABLE :: KAV(:)
+      INTEGER, ALLOCATABLE :: KAY(:)
+      INTEGER, ALLOCATABLE :: KAN(:)
+      INTEGER, ALLOCATABLE :: MCUTS(:,:)
+      INTEGER, ALLOCATABLE :: LERROR(:,:)
+      INTEGER, ALLOCATABLE :: LLEGERR(:,:)
+      INTEGER, ALLOCATABLE :: KCUTTER(:)
+      INTEGER, ALLOCATABLE :: LCUTTER(:)
+      INTEGER, ALLOCATABLE :: LLL(:)
+      INTEGER, ALLOCATABLE :: MDATA(:,:)
+      DOUBLE PRECISION, ALLOCATABLE :: ZMAT2(:,:)
+      DOUBLE PRECISION, ALLOCATABLE :: WVEC2(:)
+      DOUBLE PRECISION, ALLOCATABLE :: DSTAR(:,:)
+      DOUBLE PRECISION, ALLOCATABLE :: XDATA(:,:)
+      DOUBLE PRECISION, ALLOCATABLE :: XXX(:)
+      DOUBLE PRECISION, ALLOCATABLE :: XMAT0(:,:)
+      DOUBLE PRECISION, ALLOCATABLE :: XMAT(:,:)
+      DOUBLE PRECISION, ALLOCATABLE :: ZVEC(:,:)
+      DOUBLE PRECISION, ALLOCATABLE :: WS(:)
+      DOUBLE PRECISION, ALLOCATABLE :: XONE(:)
+      DOUBLE PRECISION, ALLOCATABLE :: XPT(:)
+      DOUBLE PRECISION, ALLOCATABLE :: ZPT(:)
+      DOUBLE PRECISION, ALLOCATABLE :: XPROJ(:,:)
+      DOUBLE PRECISION, ALLOCATABLE :: ZS(:)
+      DOUBLE PRECISION, ALLOCATABLE :: YRANK(:)
+      DOUBLE PRECISION, ALLOCATABLE :: FV1(:)
+      ALLOCATE(LDATA(NUMMEMBERS,NUMVOTES))
+      ALLOCATE(KAV(NUMVOTES))
+      ALLOCATE(KAY(NUMVOTES))
+      ALLOCATE(KAN(NUMVOTES))
+      ALLOCATE(MCUTS(NUMVOTES,2))
+      ALLOCATE(LERROR(NUMMEMBERS,NUMVOTES))
+      ALLOCATE(LLEGERR(NUMMEMBERS,2))
+      ALLOCATE(KCUTTER(NUMVOTES))
+      ALLOCATE(LCUTTER(NUMVOTES))
+      ALLOCATE(LLL(2*NUMMEMBERS+2*NUMVOTES+111))
+      ALLOCATE(MDATA(6,NUMVOTES))
+!      ALLOCATE(ZMAT2(NUMMEMBERS,NUMMEMBERS))
+      ALLOCATE(ZMAT2(1500,1500))
+      ALLOCATE(WVEC2(1500))
+!      ALLOCATE(WVEC2(NUMMEMBERS))
+      ALLOCATE(DSTAR(1500,1500))
+!      ALLOCATE(DSTAR(NUMMEMBERS,NUMMEMBERS))
+      ALLOCATE(XDATA(NUMMEMBERS,25))
+      ALLOCATE(XXX(NUMMEMBERS))
+      ALLOCATE(XMAT0(NUMMEMBERS,25))
+      ALLOCATE(XMAT(NUMMEMBERS,25))
+      ALLOCATE(ZVEC(NUMVOTES,25))
+      ALLOCATE(WS(2*NUMMEMBERS+2*NUMVOTES+111))
+      ALLOCATE(XONE(2*NUMMEMBERS+2*NUMVOTES+111))
+      ALLOCATE(XPT(2*NUMMEMBERS+2*NUMVOTES+111))
+      ALLOCATE(ZPT(NUMVOTES))
+      ALLOCATE(XPROJ(2,NUMVOTES))
+      ALLOCATE(ZS(NUMVOTES))
+      ALLOCATE(YRANK(NUMMEMBERS))
+      ALLOCATE(FV1(NUMMEMBERS))
+!
+!  100 FORMAT(6I6)
+!  150 FORMAT(I5,75F10.4)
+!  304 FORMAT(1X,78('*'))
+! 1095 FORMAT(' L-PERMUTATIONS',I3,2I8,8F9.5)
+! 1096 FORMAT(3I5,25F10.4)
+! 1097 FORMAT(2I5,6I4,2I2,25F10.4)
+! 1098 FORMAT(' R-SQUARE BEFORE AND AFTER EDITH',F10.4)
+! 1099 FORMAT(' MACHINE PREC. ',I3,2I8,3F9.5)
+!
+!    SET VARIABLES AND ARRAYS PASSED IN FROM R TO THEIR NAMES
+!        USED IN THE ORIGINAL NOMINATE AND W-NOMINATE FORTRAN
+!        CODE
+!
+!  SET PRINTER SWITCH FOR DEBUGGING PURPOSES -- 1=PRINT, 0=NO PRINT
+!
+      IPRINT=0
+!
+!  INITIALIZE RANDOM NUMBER GENERATOR
+!
+      CALL RNDSTART()
+      NS=DIMS
+      NP=NUMMEMBERS
+      NRCALL=NUMVOTES
+!
+      NDUAL=2*(NUMMEMBERS+NUMVOTES)+111
+!
+      XVMIN=0.005
+!      KVMIN=10
+      KVMIN=MIN(10,NUMVOTES-1)
+!
+!  INITIALIZE CLASSIFY
+!
+      KK=0
+      DO I=1,4
+        DO J=1,NUMVOTES+NUMMEMBERS
+          KK=KK+1
+          CLASSIFY(KK)=0.0
+        END DO
+      END DO
+!
+      DO I=1,NUMMEMBERS
+        XXX(I)=0.0
+      END DO
+!
+!  UN-TRANSPOSED CODE
+!
+      DO J=1,NUMVOTES
+        NORMALVECTORS(J)=0.0
+        DO I=1,NUMMEMBERS
+          LDATA(I,J)=VOTES(I+(J-1)*NUMMEMBERS)
+          LERROR(I,J)=0
+        END DO
+      END DO
+!
+!
+!  SUBROUTINE KPCLEAN--THROWS OUT ALL VOTES WITH LESS THAN XVMIN MAJ. AND
+!    ALL LEGISLATORS VOTING LESS THAN KVMIN TIMES
+!
+      CALL KPCLEAN(NUMMEMBERS,NUMVOTES,&
+                 NP,NRCALL,XVMIN,KVMIN,IPRINT,KPTSUM,LDATA, &
+                 KAV,KAY,KAN)
+!      CALL KPCLEAN(NP,NRCALL,XVMIN,KVMIN,IPRINT,KPTSUM,LDATA, &
+!                 KAV,KAY,KAN)
+!
+!  RESET NUMBER OF DIMENSIONS IF IT EXCEEDS NP-1
+!
+      IF(NS.GT.NP-1)THEN
+         NS=NP-1
+      ENDIF
+!
+!
+!  CALCULATE AGREEMENT SCORE MATRIX, DOUBLE-CENTER IT, AND
+!     EXTRACT EIGENVECTORS TO OBTAIN LEGISLATOR STARTS
+!
+!
+!  SET UP FOR DO LOOP THROUGH STARTING ESTIMATES
+!
+!  THIS IS THE MAXIMUM MATRIX SIZE -- NEEDED FOR KPRS(...) CALL
+!
+      NPMAX=1500
+!
+      NPKADD=1000
+      NPKADD2=500
+      NPLOOP=NP/NPKADD2
+      NPREMAIN=NP-NPLOOP*NPKADD2
+!      IF(IPRINT.EQ.1)WRITE(23,1005)NP,NPLOOP,NPKADD,NPREMAIN
+! 1005 FORMAT(' SETUP FOR MULTIPLE DECOMPOSITIONS',4I9)
+      KADD=0
+!
+      IF(NP.GE.1500)THEN
+         DO IMMM=1,NPLOOP-1
+           IF(IMMM.EQ.NPLOOP-1)NPKADD=NP-KADD
+           CALL KPASCORE(NUMMEMBERS,NUMVOTES,&
+                         NPMAX,NP,NPKADD,KADD,NRCALL,NS,NDUAL,11, &
+                          IPRINT,ZMAT2,WVEC2,DSTAR,LDATA)
+!
+!  STORE COORDINATES OF LEGISLATORS
+!
+!  COMPUTE CORRELATION OF OVERLAP
+!
+           IF(IMMM.GE.2)THEN
+              DO K=1,NS
+                ASUM=0.0
+                BSUM=0.0
+                CSUM=0.0
+                DSUM=0.0
+                ESUM=0.0
+                DO I=1,500
+                  IF(IMMM.EQ.2)EIGENVALUES(I)=WVEC2(I)
+                  ASUM=ASUM+XMAT(I+KADD,K)
+                  BSUM=BSUM+ZMAT2(I,K)
+                  CSUM=CSUM+XMAT(I+KADD,K)*XMAT(I+KADD,K)
+                  DSUM=DSUM+ZMAT2(I,K)*ZMAT2(I,K)
+                  ESUM=ESUM+XMAT(I+KADD,K)*ZMAT2(I,K)
+                END DO
+                AKP=500.0*CSUM-ASUM*ASUM
+                BKP=500.0*DSUM-BSUM*BSUM
+                CKP=500.0*ESUM-ASUM*BSUM
+                FV1(K)=CKP/SQRT(AKP*BKP)
+              END DO
+           ENDIF
+           DO K=1,NS
+             DO I=1,NPKADD
+               IF(IMMM.EQ.1)THEN
+                  XMAT(I+KADD,K)=ZMAT2(I,K)
+               ENDIF
+               IF(IMMM.GE.2)THEN
+                  IF(FV1(K).GT.0.0)XMAT(I+KADD,K)=ZMAT2(I,K)
+                  IF(FV1(K).LT.0.0)XMAT(I+KADD,K)=-ZMAT2(I,K)
+               ENDIF
+!
+             END DO
+           END DO
+!
+!  INCREMENT COUNTERS
+!
+!         IF(IPRINT.EQ.1)WRITE(11,1006)IMMM,NPKADD,KADD, &
+!                       KADD+NPKADD,FV1(1),FV1(2)
+! 1006    FORMAT(' DECOMPOSITION ',I3,3I7,2F8.4)
+           KADD=KADD+NPKADD2
+         END DO
+      ENDIF
+!
+      IF(NP.LT.1500)THEN
+         CALL KPASCORE(NUMMEMBERS,NUMVOTES,&
+                       NPMAX,NP,NP,KADD,NRCALL,NS,NDUAL,11,IPRINT, &
+                        ZMAT2,WVEC2,DSTAR,LDATA)
+      ENDIF
+!
+      DO I=1,NP
+        VOLUME(I)=0.0
+        IF(NP.LT.1500)EIGENVALUES(I)=WVEC2(I)
+        DO K=1,NS
+          IF(NP.LT.1500)THEN
+             XDATA(I,K)=ZMAT2(I,K)*SQRT(ABS(WVEC2(K)))
+          ENDIF
+          IF(NP.GE.1500)THEN
+             XDATA(I,K)=XMAT(I,K)
+          ENDIF
+          IF(NS.EQ.1)XXX(I)=XDATA(I,1)
+        END DO
+      END DO
+!
+!  NORMALIZE ESTIMATES OF LEGISLATORS TO BE WITHIN THE
+!   UNIT HYPERSPHERE WITH CENTROID = 0
+!
+!
+!  PERFORM METRIC SCALING TO INCREASE PRECISION OF STARTING COORDINATES
+!
+      IF(NP.LT.1500)THEN
+         CALL KPWHOOPE(NUMMEMBERS,NPMAX,NP,NS,DSTAR,XXX,XDATA,&
+                       SSE1,SSE2,KTP,IPRINT)
+      ENDIF
+      DO K=1,NS
+        SUM=0.0
+        BB=-99.0
+        DO I=1,NP
+          IF(NS.EQ.1)XDATA(I,1)=XXX(I)
+          SUM=SUM+XDATA(I,K)
+        END DO
+        DO I=1,NP
+          XDATA(I,K)=XDATA(I,K)-SUM/FLOAT(NP)
+          BB=MAX(BB,XDATA(I,K))
+        END DO
+        DO I=1,NP
+          XDATA(I,K)=XDATA(I,K)/BB
+        END DO
+      END DO
+!
+!  NORMALIZE ESTIMATES OF LEGISLATORS TO BE WITHIN THE
+!   UNIT HYPERSPHERE WITH CENTROID = 0
+!
+      DO K=1,NS
+        SUM=0.0
+        DO I=1,NP
+          SUM=SUM+XDATA(I,K)
+        END DO
+        DO I=1,NP
+          XDATA(I,K)=XDATA(I,K)-SUM/FLOAT(NP)
+        END DO
+      END DO
+      BB=-99.0
+      DO I=1,NP
+        SUM=0.0
+        DO K=1,NS
+          SUM=SUM+XDATA(I,K)**2
+        END DO
+        BB=MAX(BB,SUM)
+      END DO
+      DO I=1,NP
+        DO K=1,NS
+          XDATA(I,K)=XDATA(I,K)*(1.0/SQRT(BB))
+        END DO
+      END DO
+!
+!  WRITE OUT METRIC SCALING COORDINATES USED AS STARTS
+!
+      DO I=1,NP
+!      IF(IPRINT.EQ.1)WRITE(23,1914)I,(XDATA(I,JKJ),JKJ=1,NS)
+! 1914 FORMAT(I7,2F12.6)
+        DO K=1,NS
+          XMAT0(I,K)=XDATA(I,K)
+        END DO
+      END DO
+!
+!  CHECK POLARITY OF OC COORDINATES
+!
+      KLSEN=POLARITY(1)
+      IF(NS.GT.1)KLSEN2=POLARITY(2)
+      XLEFT=XMAT0(KLSEN,1)
+      IF(NS.GT.1)XUP=XMAT0(KLSEN2,2)
+      DO I=1,NP
+        IF(XLEFT.LT.0.0)THEN
+           XMAT0(I,1)=-XMAT0(I,1)
+        ENDIF
+        IF(NS.GT.1)THEN
+           IF(XUP.LT.0.0)THEN
+              XMAT0(I,2)=-XMAT0(I,2)
+           ENDIF
+        ENDIF
+        XONE(I)=XMAT0(I,1)
+        XDATA(I,1)=XMAT0(I,1)
+        IF(NS.GT.1)XDATA(I,2)=XMAT0(I,2)
+      END DO
+!
+!  INITIALIZE NORMAL VECTORS TO SQRT(1/S)
+!
+      DO JJ=1,NRCALL
+        DO K=1,NS
+          ZVEC(JJ,K)=SQRT(1.0/FLOAT(NS))
+        END DO
+      END DO
+!
+      IF(NS.GT.1)THEN
+         CALL KPZVECSTRT(NUMMEMBERS,NUMVOTES,&
+                         NP,NRCALL,NS,NDUAL,XMAT0,ZVEC,LDATA,IPRINT)
+      ENDIF
+!
+!    RUN EDITH TO GET OPTIMAL CLASSIFICATIONS FOR S=1
+!
+      CALL KPEDITH(NUMMEMBERS,NUMVOTES,&
+                   NP,NRCALL,NS,NDUAL,XMAT0,XONE,XPT,ZPT,XCLASS,KTOTC, &
+                 KCUTTER,LCUTTER,LERROR,LDATA,MSUM,IPRINT)
+!
+!  TOTAL CHOICES IN MINORITY
+!
+      MPRE=KTOTC-MSUM
+!
+!
+!  COMPUTE R-SQUARE BETWEEN EDITH COORDINATES AND COORDINATES FROM
+!    MATRIX DECOMPOSITION
+!
+      ASUM=0.0
+      BSUM=0.0
+      CSUM=0.0
+      DSUM=0.0
+      ESUM=0.0
+      DO I=1,NP
+        ASUM=ASUM+XMAT0(I,1)
+        BSUM=BSUM+XPT(I)
+        CSUM=CSUM+XMAT0(I,1)**2
+        DSUM=DSUM+XPT(I)**2
+        ESUM=ESUM+XMAT0(I,1)*XPT(I)
+!
+        XMAT0(I,1)=XPT(I)
+!
+      END DO
+      AA=FLOAT(NP)*ESUM-ASUM*BSUM
+      AB=FLOAT(NP)*CSUM-ASUM*ASUM
+      AC=FLOAT(NP)*DSUM-BSUM*BSUM
+      RSQR=(AA*AA)/(AB*AC)
+!      IF(IPRINT.EQ.1)WRITE(23,1098)RSQR
+!      IF(IPRINT.EQ.1)WRITE(*,1098)RSQR
+!
+      IF(NS.EQ.1)THEN
+!
+!  DO PERMUTATIONS OF ALL 5-ADJACENT LEGISLATOR BLOCKS TO SHARPEN
+!       RANK ORDERING
+!
+!
+      IF(NP.LT.1500)THEN
+      CALL ECHOEVENT(15)
+      CALL FLUSHCON()
+      CALL PROCEVENT()
+         NNPERM=2
+         CALL KPSHARPEN(NUMMEMBERS,NUMVOTES,&
+                        NNPERM,NP,NRCALL,NS,NDUAL,KCUTTER,LCUTTER, &
+                       XMAT0,ZPT,WS,LDATA,LERROR,IPRINT)
+      CALL ECHOEVENT(16)
+      CALL FLUSHCON()
+      CALL PROCEVENT()
+         NNPERM=3
+         CALL KPSHARPEN(NUMMEMBERS,NUMVOTES,&
+                       NNPERM,NP,NRCALL,NS,NDUAL,KCUTTER,LCUTTER, &
+                       XMAT0,ZPT,WS,LDATA,LERROR,IPRINT)
+!         NNPERM=4
+!         CALL KPSHARPEN(NUMMEMBERS,NUMVOTES,&
+!                        NNPERM,NP,NRCALL,NS,NDUAL,KCUTTER,LCUTTER,
+!     C                 XMAT0,ZPT,WS,LDATA,LERROR,IPRINT)
+      ENDIF
+!
+!  CALCULATE ERRORS
+!
+         DO I=1,NP
+           KITOT=0
+           KIERR=0
+           DO JX=1,NRCALL
+             IF(LDATA(I,JX).NE.0)KITOT=KITOT+1
+             IF(LERROR(I,JX).EQ.1)KIERR=KIERR+1
+           END DO
+           LLEGERR(I,1)=KIERR
+           LLEGERR(I,2)=KITOT
+         END DO
+!
+!  RANK ORDER THE LEGISLATORS
+!
+         DO I=1,NP
+           XXX(I)=XMAT0(I,1)
+           LLL(I)=I
+         END DO
+         CALL KPRSORT(XXX,NP,LLL)
+!
+         DO I=1,NP
+           YRANK(I)=0.0
+           KK=0
+           LL=0
+           JJ=0
+           DO J=1,NP
+             JJ=JJ+1
+             IF(ABS(XXX(I)-XXX(J)).LE..00001)THEN
+                KK=KK+1
+                LL=LL+JJ
+             ENDIF
+           END DO
+           YRANK(I)=FLOAT(LL)/FLOAT(KK)
+         END DO
+!
+!
+!  WRITE OUT LEGISLATOR COORDINATES -- SORTED AND UNSORTED BY RANK
+!
+         DO I=1,NP
+           FV1(LLL(I))=YRANK(I)
+           BPER=FLOAT(LLEGERR(LLL(I),2)-LLEGERR(LLL(I),1))/ &
+                                           FLOAT(LLEGERR(LLL(I),2))
+!         IF(IPRINT.EQ.1)WRITE(11,1096)I, &
+!                         LLEGERR(LLL(I),1),LLEGERR(LLL(I),2), &
+!                                  BPER,YRANK(I)
+         END DO
+!         IF(IPRINT.EQ.1)WRITE(11,304)
+         DO I=1,NP
+           BPER=FLOAT(LLEGERR(I,2)-LLEGERR(I,1))/ &
+                                           FLOAT(LLEGERR(I,2))
+!         IF(IPRINT.EQ.1)WRITE(11,1096)I, &
+!                         LLEGERR(I,1),LLEGERR(I,2), &
+!                                  BPER,FV1(I)
+!
+!  TRANSFER OC COORDINATES TO OUTPUT VECTOR
+!
+           IDEALPOINTS(I)=FV1(I)
+         END DO
+!
+!  WRITE OUT ROLL CALL CLASSIFICATIONS
+!
+!         IF(IPRINT.EQ.1)WRITE(11,304)
+         KTSUM=0
+         NMISS=0
+         DO J=1,NRCALL
+           KSUM=0
+           KYES=0
+           KNO=0
+           KYEAYEA=0
+           KNAYNAY=0
+           KYEANAY=0
+           KNAYYEA=0
+           NSAVEI=0
+           DO I=1,NP
+             IF(LDATA(I,J).EQ.0)NMISS=NMISS+1
+             IF(LDATA(I,J).EQ.1)KYES=KYES+1
+             IF(LDATA(I,J).EQ.6)KNO=KNO+1
+             IF(LERROR(I,J).EQ.0)THEN
+!
+!  CORRECT CHOICE -- YEA
+!
+                IF(LDATA(I,J).EQ.1)THEN
+                   KYEAYEA=KYEAYEA+1
+                   CLASSIFY((I-1)*4 + 1)=CLASSIFY((I-1)*4 + 1)+1
+                ENDIF
+!
+!  CORRECT CHOICE -- NAY
+!
+                IF(LDATA(I,J).EQ.6)THEN
+                   KNAYNAY=KNAYNAY+1
+                   CLASSIFY((I-1)*4 + 4)=CLASSIFY((I-1)*4 + 4)+1
+                ENDIF
+             ENDIF
+             IF(LERROR(I,J).EQ.1)THEN
+                KSUM=KSUM+1
+!
+!  INCORRECT CHOICE -- VOTED YEA INSTEAD OF NAY
+!
+                IF(LDATA(I,J).EQ.1)THEN
+                   KYEANAY=KYEANAY+1
+                   CLASSIFY((I-1)*4 + 3)=CLASSIFY((I-1)*4 + 3)+1
+                ENDIF
+!
+!  INCORRECT CHOICE -- VOTED NAY INSTEAD OF YEA
+!
+                IF(LDATA(I,J).EQ.6)THEN
+                   KNAYYEA=KNAYYEA+1
+                   CLASSIFY((I-1)*4 + 2)=CLASSIFY((I-1)*4 + 2)+1
+                ENDIF
+             ENDIF
+             IF(ZPT(J).LT.XXX(1))THEN
+                ZDOWN=YRANK(1)
+                ZUP=YRANK(1)
+                NSAVEI=I
+                GO TO 812
+             ENDIF
+             IF(ZPT(J).GT.XXX(NP))THEN
+                ZDOWN=YRANK(NP)
+                ZUP=YRANK(NP)
+                NSAVEI=I
+                GO TO 812
+             ENDIF
+             IF(I.LT.NP)THEN
+             IF(ZPT(J).GT.XXX(I).AND.ZPT(J).LT.XXX(I+1))THEN
+                ZDOWN=YRANK(I)
+                ZUP=YRANK(I+1)
+                NSAVEI=I
+             ENDIF
+             ENDIF
+ 812         CONTINUE
+           END DO
+!
+!  TAKE CARE OF TIED RANKS/PRECISION PROBLEMS
+!
+           IF(NSAVEI.EQ.0)THEN
+              DO I=1,NP
+                IF(ABS(XXX(I)-ZPT(J)).LE..00001)THEN
+                   ZDOWN=YRANK(I)
+                   ZUP=YRANK(I)
+                   NSAVEI=I
+                   GO TO 8124
+                ENDIF
+              END DO
+           ENDIF
+ 8124      CONTINUE
+           KTSUM=KTSUM+KSUM
+           KYESNO=MIN(KYES,KNO)
+           XCLASS=FLOAT(KYEAYEA+KNAYNAY)/ &
+                      FLOAT(KYEAYEA+KNAYNAY+KYEANAY+KNAYYEA)
+           XPRE=FLOAT(KYESNO-KSUM)/FLOAT(KYESNO)
+!
+!  COMPUTE CUTTING POINT ON NORMAL VECTOR
+!
+!         IF(IPRINT.EQ.1)WRITE(11,1097)J,KAV(J),KYES,KNO, &
+!                      KYEAYEA,KNAYYEA,KYEANAY,KNAYNAY, &
+!                      KCUTTER(J),LCUTTER(J), &
+!                      XCLASS,XPRE,(ZDOWN+ZUP)/2.0
+           CLASSIFY(NUMMEMBERS*4 + (J-1)*4 + 1)=KYEAYEA
+           CLASSIFY(NUMMEMBERS*4 + (J-1)*4 + 2)=KNAYYEA
+           CLASSIFY(NUMMEMBERS*4 + (J-1)*4 + 3)=KYEANAY
+           CLASSIFY(NUMMEMBERS*4 + (J-1)*4 + 4)=KNAYNAY
+           LLL(J)=J
+           MDATA(1,J)=KYES
+           MDATA(2,J)=KNO
+           MDATA(3,J)=KYEAYEA
+           MDATA(4,J)=KYEAYEA
+           MDATA(5,J)=KYEAYEA
+           MDATA(6,J)=KYEAYEA
+           XPROJ(1,J)=XCLASS
+           XPROJ(2,J)=XPRE
+           ZS(J)=(ZDOWN+ZUP)/2.0
+           MIDPOINTS(J)=ZS(J)
+         END DO
+         CALL KPRSORT(ZS,NRCALL,LLL)
+!         IF(IPRINT.EQ.1)WRITE(11,304)
+         DO J=1,NRCALL
+!         IF(IPRINT.EQ.1)WRITE(11,1097)LLL(J),KAV(LLL(J)), &
+!                       (MDATA(JJ,LLL(J)),JJ=1,6), &
+!                       KCUTTER(LLL(J)),LCUTTER(LLL(J)), &
+!                       XPROJ(1,LLL(J)), &
+!                       XPROJ(2,LLL(J)),ZS(J)
+         END DO
+         XHECK=1.0-(FLOAT(KTSUM)/FLOAT(NP*NRCALL-NMISS))
+         XPRE=FLOAT(MPRE-KTSUM)/FLOAT(MPRE)
+!         IF(IPRINT.EQ.1)WRITE(21,1095)NNPERM,KTSUM, &
+!                       NP*NRCALL-NMISS,1.0-XHECK,XHECK,XPRE
+         FITS(1)=XHECK
+         FITS(2)=XPRE
+      ENDIF
+!
+!  RETURN IF ONE DIMENSION
+!
+      EXITSTATUS=1
+      IF(NS.EQ.1) THEN
+        DEALLOCATE(LDATA)
+        DEALLOCATE(KAV)
+        DEALLOCATE(KAY)
+        DEALLOCATE(KAN)
+        DEALLOCATE(MCUTS)
+        DEALLOCATE(LERROR)
+        DEALLOCATE(LLEGERR)
+        DEALLOCATE(KCUTTER)
+        DEALLOCATE(LCUTTER)
+        DEALLOCATE(LLL)
+        DEALLOCATE(MDATA)
+        DEALLOCATE(ZMAT2)
+        DEALLOCATE(WVEC2)
+        DEALLOCATE(DSTAR)
+        DEALLOCATE(XDATA)
+        DEALLOCATE(XXX)
+        DEALLOCATE(XMAT0)
+        DEALLOCATE(XMAT)
+        DEALLOCATE(ZVEC)
+        DEALLOCATE(WS)
+        DEALLOCATE(XONE)
+        DEALLOCATE(XPT)
+        DEALLOCATE(ZPT)
+        DEALLOCATE(XPROJ)
+        DEALLOCATE(ZS)
+        DEALLOCATE(YRANK)
+        DEALLOCATE(FV1)
+        RETURN
+      ENDIF
+!
+!  &&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+!    TWO OR MORE DIMENSIONS BELOW
+!  &&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+!
+!
+!  TRANSFER METRIC SCALING STARTING COORDINATES BACK INTO XMAT0(.,.)
+!
+      DO I=1,NP
+        DO K=1,NS
+          XMAT0(I,K)=XDATA(I,K)
+        END DO
+      END DO
+!
+      IFIXX=1
+      DO JJJ=1,10
+        CALL KPCUTPLANE(NUMMEMBERS,NUMVOTES,&
+                        JJJ,NP,NRCALL,NS,NDUAL,XMAT0,ZVEC,WS, &
+                        MCUTS,LERROR,IFIXX,KTT,KT,LDATA,IPRINT)
+!
+        CALL KPLEGIS(NUMMEMBERS,NUMVOTES,&
+                     JJJ,NP,NRCALL,NS,NDUAL,XMAT0,LLEGERR, &
+                          ZVEC,WS,MCUTS,LERROR,LTOTAL,MWRONG, &
+                          LDATA,IPRINT)
+!
+      END DO
+      KTSAVE=KT
+!
+!  TRANSFER OC COORDINATES TO OUTPUT VECTOR
+!
+      DO I=1,NP
+        DO K=1,NS
+          IDEALPOINTS(I+(K-1)*NUMMEMBERS)=XMAT0(I,K)
+        END DO
+      END DO
+!
+!  CALCULATE VOLUME FOR LEGISLATORS
+!
+!
+      DO I=1,NP
+        IX=I
+!
+        CALL KPVOLUME2(NUMMEMBERS,NUMVOTES,&
+                       IX,NS,NP,NRCALL,NDUAL,XMAT0,ZVEC,WS,LDATA,BMAX, &
+                      KBMAX,IPRINT)
+!
+        BPER=FLOAT(LLEGERR(I,2)-LLEGERR(I,1))/FLOAT(LLEGERR(I,2))
+!      IF(IPRINT.EQ.1)WRITE(25,1096)I,LLEGERR(I,1),LLEGERR(I,2), &
+!                                   BPER,BMAX,(XMAT0(I,K),K=1,NS)
+        VOLUME(I)=BMAX
+!
+      END DO
+!
+!  PLACE NORMAL VECTOR IN POSITIVE SIDE OF HYPERSPHERE
+!    AND COMPUTE REDUNDANCY CHECK
+!
+      MPRE=0
+      KCHECK4=0
+      DO JX=1,NRCALL
+        KCUT=MCUTS(JX,1)
+        LCUT=MCUTS(JX,2)
+!
+!  CHECK SIGN HERE
+!
+        IF(ZVEC(JX,1).LT.0.0)THEN
+           DO K=1,NS
+             ZVEC(JX,K)=-ZVEC(JX,K)
+           END DO
+           WS(JX)=-WS(JX)
+           KCUT=MCUTS(JX,2)
+           LCUT=MCUTS(JX,1)
+           MCUTS(JX,1)=KCUT
+           MCUTS(JX,2)=LCUT
+        ENDIF
+!
+        KSUM=0
+        KYES=0
+        KNO=0
+        KLOW=0
+        KHIGH=0
+        KYEAYEA=0
+        KNAYNAY=0
+        KYEANAY=0
+        KNAYYEA=0
+        DO I=1,NP
+          IF(LDATA(I,JX).EQ.1)KYES=KYES+1
+          IF(LDATA(I,JX).EQ.6)KNO=KNO+1
+          IF(LERROR(I,JX).EQ.1)KSUM=KSUM+1
+!
+!      CALCULATE PREDICTED MARGIN
+!
+          SUM=0.0
+          DO K=1,NS
+            SUM=SUM+XMAT0(I,K)*ZVEC(JX,K)
+          END DO
+          IF(LDATA(I,JX).EQ.0)GO TO 993
+          IF(SUM.LE.WS(JX))THEN
+!
+!  INCORRECT CHOICE
+!
+             IF(LDATA(I,JX).NE.KCUT)THEN
+                KCHECK4=KCHECK4+1
+!
+!  INCORRECT CHOICE -- VOTED YEA INSTEAD OF NAY
+!
+                IF(LDATA(I,JX).EQ.1)THEN
+                   KYEANAY=KYEANAY+1
+                   CLASSIFY((I-1)*4 + 3)=CLASSIFY((I-1)*4 + 3)+1
+                ENDIF
+!
+!  INCORRECT CHOICE -- VOTED NAY INSTEAD OF YEA
+!
+                IF(LDATA(I,JX).EQ.6)THEN
+                   KNAYYEA=KNAYYEA+1
+                   CLASSIFY((I-1)*4 + 2)=CLASSIFY((I-1)*4 + 2)+1
+                ENDIF
+             ENDIF
+!
+!  CORRECT CHOICE -- YEA
+!
+             IF(LDATA(I,JX).EQ.KCUT.AND.LDATA(I,JX).EQ.1)THEN
+                KYEAYEA=KYEAYEA+1
+                CLASSIFY((I-1)*4 + 1)=CLASSIFY((I-1)*4 + 1)+1
+             ENDIF
+!
+!  CORRECT CHOICE -- NAY
+!
+             IF(LDATA(I,JX).EQ.KCUT.AND.LDATA(I,JX).EQ.6)THEN
+                KNAYNAY=KNAYNAY+1
+                CLASSIFY((I-1)*4 + 4)=CLASSIFY((I-1)*4 + 4)+1
+             ENDIF
+          ENDIF
+          IF(SUM.GT.WS(JX))THEN
+             IF(LDATA(I,JX).NE.LCUT)THEN
+                KCHECK4=KCHECK4+1
+!
+!  INCORRECT CHOICE -- VOTED YEA INSTEAD OF NAY
+!
+                IF(LDATA(I,JX).EQ.1)THEN
+                   KYEANAY=KYEANAY+1
+                   CLASSIFY((I-1)*4 + 3)=CLASSIFY((I-1)*4 + 3)+1
+                ENDIF
+!
+!  INCORRECT CHOICE -- VOTED NAY INSTEAD OF YEA
+!
+                IF(LDATA(I,JX).EQ.6)THEN
+                   KNAYYEA=KNAYYEA+1
+                   CLASSIFY((I-1)*4 + 2)=CLASSIFY((I-1)*4 + 2)+1
+                ENDIF
+             ENDIF
+!
+!  CORRECT CHOICE -- YEA
+!
+             IF(LDATA(I,JX).EQ.LCUT.AND.LDATA(I,JX).EQ.1)THEN
+                KYEAYEA=KYEAYEA+1
+                CLASSIFY((I-1)*4 + 1)=CLASSIFY((I-1)*4 + 1)+1
+             ENDIF
+!
+!  CORRECT CHOICE -- NAY
+!
+             IF(LDATA(I,JX).EQ.LCUT.AND.LDATA(I,JX).EQ.6)THEN
+                KNAYNAY=KNAYNAY+1
+                CLASSIFY((I-1)*4 + 4)=CLASSIFY((I-1)*4 + 4)+1
+             ENDIF
+          ENDIF
+ 993      CONTINUE
+!
+          IF(SUM.LT.WS(JX))THEN
+             KLOW=KLOW+1
+          ENDIF
+          IF(SUM.GT.WS(JX))THEN
+             KHIGH=KHIGH+1
+          ENDIF
+        END DO
+        KYESNO=MIN(KYES,KNO)
+        MPRE=MPRE+KYESNO
+        XCLASS=FLOAT(KYEAYEA+KNAYNAY)/ &
+                      FLOAT(KYEAYEA+KNAYNAY+KYEANAY+KNAYYEA)
+        XPRE=FLOAT(KYESNO-KSUM)/FLOAT(KYESNO)
+!
+!      IF(IPRINT.EQ.1)WRITE(25,1097)JX,KAV(JX),KYES,KNO, &
+!                      KYEAYEA,KNAYYEA,KYEANAY,KNAYNAY, &
+!                      KCUT,LCUT,XCLASS,XPRE,WS(JX), &
+!                      (ZVEC(JX,K),K=1,NS)
+        CLASSIFY(NUMMEMBERS*4 + (JX-1)*4 + 1)=KYEAYEA
+        CLASSIFY(NUMMEMBERS*4 + (JX-1)*4 + 2)=KNAYYEA
+        CLASSIFY(NUMMEMBERS*4 + (JX-1)*4 + 3)=KYEANAY
+        CLASSIFY(NUMMEMBERS*4 + (JX-1)*4 + 4)=KNAYNAY
+        MIDPOINTS(JX)=WS(JX)
+        DO K=1,NS
+          NORMALVECTORS(JX+(K-1)*NUMVOTES)=ZVEC(JX,K)
+        END DO
+      END DO
+!
+      XERROR=FLOAT(KCHECK4)/FLOAT(KTSAVE)
+      YERROR=1.0-XERROR
+      XPRE=FLOAT(MPRE-KCHECK4)/FLOAT(MPRE)
+!      IF(IPRINT.EQ.1)WRITE(23,1099)NS,KCHECK4,KTSAVE,XERROR,YERROR,XPRE
+      FITS(1)=YERROR
+      FITS(2)=XPRE
+!
+!
+!  SHUT DOWN RANDOM NUMBER GENERATOR
+!
+      CALL RNDEND()
+      EXITSTATUS=1
+      DEALLOCATE(LDATA)
+      DEALLOCATE(KAV)
+      DEALLOCATE(KAY)
+      DEALLOCATE(KAN)
+      DEALLOCATE(MCUTS)
+      DEALLOCATE(LERROR)
+      DEALLOCATE(LLEGERR)
+      DEALLOCATE(KCUTTER)
+      DEALLOCATE(LCUTTER)
+      DEALLOCATE(LLL)
+      DEALLOCATE(MDATA)
+      DEALLOCATE(ZMAT2)
+      DEALLOCATE(WVEC2)
+      DEALLOCATE(DSTAR)
+      DEALLOCATE(XDATA)
+      DEALLOCATE(XXX)
+      DEALLOCATE(XMAT0)
+      DEALLOCATE(XMAT)
+      DEALLOCATE(ZVEC)
+      DEALLOCATE(WS)
+      DEALLOCATE(XONE)
+      DEALLOCATE(XPT)
+      DEALLOCATE(ZPT)
+      DEALLOCATE(XPROJ)
+      DEALLOCATE(ZS)
+      DEALLOCATE(YRANK)
+      DEALLOCATE(FV1)
+      RETURN
+        END
+!
+! ****************************************************************************
+!  SUBROUTINE KPCLEAN----CALLED BY MAIN.  THROWS OUT ALL ROLLCALLS BELOW A
+!     CUTOFF POINT (XVMIN)--USUALLY .05 OR .025.  THROWS OUT ALL LEGISLATORS
+!     WHO HAVE VOTED KVMIN TIMES OR LESS (KVMIN=10 USUALLY).  KNAME(,)--
+!     CHARACTER ARRAY HOLDING INFORMATION ON LEGISLATORS IS REARRANGED TO
+!     HOLD ONLY INCLUDED LEGISLATORS.  LDATA( , ) IS THEN FILLED WITH THE
+!     INCLUDED ROLL CALL VOTES.
+! ****************************************************************************
+!
+      SUBROUTINE KPCLEAN(NUMMEMBERS,NUMVOTES,&
+                       NP,NRCALL,XVMIN,KVMIN,IPRINT,KPTSUM,LDATA, &
+                       KAV,KAY,KAN)
+      IMPLICIT DOUBLE PRECISION(A-H,O-Z)
+      DIMENSION KAV(NUMVOTES),KAY(NUMVOTES),KAN(NUMVOTES),&
+                LDATA(NUMMEMBERS,NUMVOTES)
+!
+      INTEGER, ALLOCATABLE :: KD(:)
+      INTEGER, ALLOCATABLE :: KMARG(:)
+      INTEGER, ALLOCATABLE :: KKSUM(:)
+      INTEGER, ALLOCATABLE :: LLSUM(:)
+      INTEGER, ALLOCATABLE :: MMSUM(:)
+      INTEGER, ALLOCATABLE :: NNSUM(:)
+!      CHARACTER, ALLOCATABLE :: LMARG(:)
+      ALLOCATE(KD(NUMVOTES))
+      ALLOCATE(KMARG(50))
+      ALLOCATE(KKSUM(NUMVOTES))
+      ALLOCATE(LLSUM(NUMVOTES))
+      ALLOCATE(MMSUM(NUMMEMBERS))
+      ALLOCATE(NNSUM(NUMMEMBERS))
+!      ALLOCATE(LMARG(10))
+!
+!      IF(IPRINT.EQ.1)THEN
+!        WRITE(23,1010)NRCALL,NP,KVMIN,XVMIN
+! 1010 FORMAT(3I7,F8.3)
+!      ENDIF
+      IF(IPRINT.EQ.1) IPRINT=1  !IPRINT hack to get rid of warnings
+      DO I=1,NRCALL
+        KKSUM(I)=0
+        LLSUM(I)=0
+      END DO
+      DO I=1,50
+        KMARG(I)=0
+      END DO
+!
+!      LMARG(1)= '50 - 55   '
+!      LMARG(2)= '56 - 60   '
+!      LMARG(3)= '61 - 65   '
+!      LMARG(4)= '66 - 70   '
+!      LMARG(5)= '71 - 75   '
+!      LMARG(6)= '76 - 80   '
+!      LMARG(7)= '81 - 85   '
+!      LMARG(8)= '86 - 90   '
+!      LMARG(9)= '91 - 95   '
+!      LMARG(10)='96 - 99.5 '
+      KPTSUM=0
+      NAS=0
+      NRS=0
+      NOB=0
+      NMOB=0
+      DO I=1,NP
+        ISUM=0
+        JSUM=0
+        DO J=1,NRCALL
+          KD(J)=LDATA(I,J)
+          IF(KD(J).EQ.1.OR.KD(J).EQ.2.OR.KD(J).EQ.3)KKSUM(J)=KKSUM(J)+1
+          IF(KD(J).EQ.1.OR.KD(J).EQ.2.OR.KD(J).EQ.3)ISUM=ISUM+1
+          IF(KD(J).EQ.4.OR.KD(J).EQ.5.OR.KD(J).EQ.6)LLSUM(J)=LLSUM(J)+1
+          IF(KD(J).EQ.4.OR.KD(J).EQ.5.OR.KD(J).EQ.6)JSUM=JSUM+1
+        END DO
+        MMSUM(I)=ISUM
+        NNSUM(I)=JSUM
+      END DO
+      DO I=1,NP
+        LL=MMSUM(I)+NNSUM(I)
+        IF(LL.GT.KVMIN)NOB=NOB+1
+        IF(LL.LE.KVMIN)NMOB=NMOB+1
+        IF(LL.LE.KVMIN)GO TO 3
+        NAS=0
+        NRS=0
+        DO J=1,NRCALL
+          KD(J)=LDATA(I,J)
+          KK=KKSUM(J)+LLSUM(J)
+          LL=MIN0(KKSUM(J),LLSUM(J))
+!      IF(KD(J).GT.9)STOP
+          AA=0.0
+          IF(KK.GT.0)AA=FLOAT(LL)/FLOAT(KK)
+          IF(AA.GT.XVMIN)NAS=NAS+1
+          IF(AA.LE.XVMIN)NRS=NRS+1
+          IF(AA.GT.XVMIN)KAV(NAS)=J
+          IF(AA.GT.XVMIN)KAY(NAS)=KKSUM(J)
+          IF(AA.GT.XVMIN)KAN(NAS)=LLSUM(J)
+          IF(AA.LE.XVMIN)GO TO 33
+          IF(KD(J).EQ.2.OR.KD(J).EQ.3)KD(J)=1
+          IF(KD(J).EQ.4.OR.KD(J).EQ.5)KD(J)=6
+          IF(KD(J).EQ.7.OR.KD(J).EQ.8.OR.KD(J).EQ.9)KD(J)=0
+          LDATA(NOB,NAS)=KD(J)
+          IF(KD(J).NE.0)KPTSUM=KPTSUM+1
+ 33       CONTINUE
+        END DO
+ 3      CONTINUE
+      END DO
+!      IF(IPRINT.EQ.1)WRITE(23,1000)NRCALL,NRS,NAS,XVMIN
+! 1000 FORMAT(' ROLL-CALLS READ=',I4,2X,'NUMBER REJECTED=',I4,2X, &
+!      'NUMBER ACCEPTED=',I4,2X,'CUTOFF=',F6.3)
+!      IF(IPRINT.EQ.1)WRITE(23,1001)NP,NMOB,NOB,KVMIN
+! 1001 FORMAT(' LEGISLATORS READ=',I4,2X,'NUMBER REJECTED=',I4,2X, &
+!      'NUMBER ACCEPTED=',I4,2X,'CUTOFF=',I4)
+      NRCALL=NAS
+      NP=NOB
+!
+!   CALCULATE DISTRIBUTION OF ROLL CALL MARGINS
+!
+      DO J=1,NRCALL
+        KAY(J)=0
+        KAN(J)=0
+        DO I=1,NP
+          IF(LDATA(I,J).EQ.1)KAY(J)=KAY(J)+1
+          IF(LDATA(I,J).EQ.6)KAN(J)=KAN(J)+1
+        END DO
+      END DO
+      LLTOT=0
+      LLALL=0
+      DO J=1,NRCALL
+        LL=MAX0(KAY(J),KAN(J))
+        LLTOT=LLTOT+LL
+        AA=FLOAT(LL)/FLOAT(KAY(J)+KAN(J))
+        LLALL=LLALL+KAY(J)+KAN(J)
+        IF(AA.GE..50.AND.AA.LE..55)KMARG(1)=KMARG(1)+1
+        IF(AA.GT..55.AND.AA.LE..60)KMARG(2)=KMARG(2)+1
+        IF(AA.GT..60.AND.AA.LE..65)KMARG(3)=KMARG(3)+1
+        IF(AA.GT..65.AND.AA.LE..70)KMARG(4)=KMARG(4)+1
+        IF(AA.GT..70.AND.AA.LE..75)KMARG(5)=KMARG(5)+1
+        IF(AA.GT..75.AND.AA.LE..80)KMARG(6)=KMARG(6)+1
+        IF(AA.GT..80.AND.AA.LE..85)KMARG(7)=KMARG(7)+1
+        IF(AA.GT..85.AND.AA.LE..90)KMARG(8)=KMARG(8)+1
+        IF(AA.GT..90.AND.AA.LE..95)KMARG(9)=KMARG(9)+1
+        IF(AA.GT..95.AND.AA.LE..995)KMARG(10)=KMARG(10)+1
+      END DO
+!      IF(IPRINT.EQ.1)WRITE(23,1003)
+! 1003 FORMAT('  DISTRIBUTION OF SCALABLE ROLL CALLS')
+      DO I=1,10
+        AA=FLOAT(KMARG(I))/FLOAT(NRCALL)
+      END DO
+      XSUM=FLOAT(LLTOT)/FLOAT(LLALL)
+!      IF(IPRINT.EQ.1)WRITE(23,1004)LLTOT,LLALL,XSUM
+! 1004 FORMAT(' AVERAGE MAJORITY MARGIN= ',2I8,F9.5)
+      DEALLOCATE(KD)
+      DEALLOCATE(KMARG)
+      DEALLOCATE(KKSUM)
+      DEALLOCATE(LLSUM)
+      DEALLOCATE(MMSUM)
+      DEALLOCATE(NNSUM)
+!      DEALLOCATE(LMARG)
+      RETURN
+      END
+!
+! **************************************************************************
+!
+!  SUBROUTINE KPASCORE -- PERFORMS EIGENVALUE-EIGENVECTOR DECOMPOSITION OF
+!                       THE MATRIX OF LEGISLATOR BY LEGISLATOR AGREEMENT
+!                       SCORES
+!
+! **************************************************************************
+!
+      SUBROUTINE KPASCORE(NUMMEMBERS,NUMVOTES,&
+                        NPMAX,NP,NPKADD,KADD,NRCALL,NS,NDUAL,KIO, &
+                        IPRINT,ZMAT2,WVEC2,DSTAR,LDATA)
+      IMPLICIT DOUBLE PRECISION(A-H,O-Z)
+      DIMENSION WVEC2(NPMAX),ZMAT2(NPMAX,NPMAX), &
+                          DSTAR(NPMAX,NPMAX),&
+                          LDATA(NUMMEMBERS,NUMVOTES)
+!
+      DOUBLE PRECISION, ALLOCATABLE :: XCOL(:)
+      DOUBLE PRECISION, ALLOCATABLE :: XROW(:)
+      INTEGER, ALLOCATABLE :: KROW(:)
+      INTEGER, ALLOCATABLE :: IWORK(:)
+      DOUBLE PRECISION, ALLOCATABLE :: FV1(:)
+      DOUBLE PRECISION, ALLOCATABLE :: FV2(:)
+      DOUBLE PRECISION, ALLOCATABLE :: XAGREE(:,:)
+      DOUBLE PRECISION, ALLOCATABLE :: ROWMEAN(:)
+      DOUBLE PRECISION, ALLOCATABLE :: WORK(:)
+      DOUBLE PRECISION, ALLOCATABLE :: YCENTER(:,:)
+      DOUBLE PRECISION, ALLOCATABLE :: VVV(:,:)
+      ALLOCATE(XCOL(NRCALL))
+      ALLOCATE(XROW(NPMAX))
+      ALLOCATE(KROW(NPMAX))
+      ALLOCATE(IWORK(8*NPMAX))
+      ALLOCATE(FV1(NPMAX))
+      ALLOCATE(FV2(NPMAX))
+      ALLOCATE(XAGREE(NPMAX,NPMAX))
+      ALLOCATE(ROWMEAN(NPMAX))
+      ALLOCATE(WORK(8*NPMAX*NPMAX+1875))
+      ALLOCATE(YCENTER(NPMAX,NPMAX))
+      ALLOCATE(VVV(NPMAX,NPMAX))
+!
+      LWORK=8*NPMAX*NPMAX+1875
+      KPDUDE=NP
+!  101 FORMAT(' PERFORMANCE INDEX EIGENVALUE/VECTOR ROUTINE=' &
+!             ,3I5,I6)
+!  102 FORMAT(I4,9F10.4)
+! 1000 FORMAT(3F10.4)
+      IF(IPRINT.EQ.1) IPRINT=1  !hack to get rid of warnings
+      IF(NS.EQ.1) NS=1  !hack to get rid of warnings
+      IF(KIO.EQ.1) KIO=1  !hack to get rid of warnings
+      IF(NDUAL.EQ.1) NDUAL=1  !hack to get rid of warnings
+      CALL ECHOEVENT(9)
+      CALL FLUSHCON()
+      CALL PROCEVENT()
+      DO I=1,NRCALL
+        XCOL(I)=0.0
+      END DO
+      DO I=1,NPKADD
+        XROW(I)=0.0
+        KROW(I)=0
+        ROWMEAN(I)=0.0
+      END DO
+!
+!  PERFORM THE PSEUDO-DOUBLE CENTER
+!
+!  CALCULATE THE ROLL CALL MEANS (#YEAS/#VOTING)
+!
+      XMAT=0.0
+      KMAT=0
+      XCHK1=0.0
+      DO J=1,NRCALL
+        SUM=0.0
+        KK=0
+        DO I=1,NPKADD
+          IF(LDATA(I+KADD,J).NE.0)THEN
+             KK=KK+1
+             KROW(I)=KROW(I)+1
+          ENDIF
+          IF(LDATA(I+KADD,J).EQ.1)THEN
+             SUM=SUM+1.0
+             XROW(I)=XROW(I)+1.0
+          ENDIF
+        END DO
+        XMAT=XMAT+SUM
+        KMAT=KMAT+KK
+        XCOL(J)=SUM/FLOAT(KK)
+        XCHK1=XCHK1+XCOL(J)
+      END DO
+      XCHK2=0.0
+      DO I=1,NPKADD
+        XROW(I)=XROW(I)/FLOAT(KROW(I))
+        XCHK2=XCHK2+XROW(I)
+      END DO
+!
+!  MATRIX MEAN
+!
+      XCHK1=XCHK1/FLOAT(NRCALL)
+      XCHK2=XCHK2/FLOAT(NPKADD)
+      XMAT=XMAT/FLOAT(KMAT)
+!      IF(IPRINT.EQ.1)WRITE(23,1000)XCHK1,XCHK2,XMAT
+!
+!  COMPUTE HECKMAN-SNYDER COVARIANCE MATRIX
+!
+      ALLMEAN=0.0
+      KZERO=0
+      DO I=1,NPKADD
+        RSUM=0.0
+        DO J=1,NPKADD
+          SUM=0.0
+          KK=0
+          KKK=0
+          DO K=1,NRCALL
+            IF(LDATA(I+KADD,K).EQ.0)GO TO 9
+            IF(LDATA(J+KADD,K).EQ.0)GO TO 9
+            KK=KK+1
+!
+!  SET UP SYMMETRIC MATRIX OF AGREEMENT SCORES
+!
+            IF(LDATA(I+KADD,K).EQ.LDATA(J+KADD,K))THEN
+               KKK=KKK+1
+            ENDIF
+ 9          CONTINUE
+          END DO
+          IF(KK.EQ.0)THEN
+             XAGREE(I,J)=0.25
+             DSTAR(I,J)=1.0
+             GO TO 88
+          ENDIF
+          XAGREE(I,J)=(1.0 - (FLOAT(KKK)/FLOAT(KK)))**2
+          DSTAR(I,J)=(100.0 - (FLOAT(KKK)/FLOAT(KK))*100.0)/50.0
+ 88       CONTINUE
+          RSUM=RSUM+XAGREE(I,J)
+        END DO
+        ROWMEAN(I)=RSUM/FLOAT(NPKADD)
+        ALLMEAN=ALLMEAN+ROWMEAN(I)
+      END DO
+      ALLMEAN=ALLMEAN/FLOAT(NPKADD)
+!
+!  SETUP DOUBLE-CENTERED AGREEMENT SCORE MATRIX
+!
+      DO I=1,NPKADD
+        DO J=1,NPKADD
+          YCENTER(I,J)=(XAGREE(I,J)-ROWMEAN(I)-ROWMEAN(J)+ALLMEAN)/(-2.0)
+        END DO
+      END DO
+!
+!
+!  EIGENVECTOR-EIGENVALUE DECOMPOSITION DOUBLE-CENTERED AGREEMENT
+!     SCORE MATRIX
+!
+!
+!  CALL SINGULAR VALUE DECOMPOSITION ROUTINE
+!
+!      CALL LSVRR(NP,NS,Y16MIDP,NP,21,XTOL,IRANK,YHAT,Y16MIDP,
+!     C           NP,VVV,25)
+!      SUBROUTINE DGESDD( JOBZ, M, N, A, LDA, S, U, LDU, VT, LDVT, WORK,
+!                         LWORK, IWORK, INFO )
+      CALL DGESDD('S',NPKADD,NPKADD,YCENTER,NPMAX,WVEC2,ZMAT2, &
+                 NPMAX,VVV,NPMAX,WORK,LWORK,IWORK,IRANK)
+!
+!
+!  RIGHT WAY -- DGESDD RETURNS V_transpose, NOT V, SO THE
+!               S_th ROW IS TRANSFERRED
+!
+!      ZVEC(JX,K)=VVV(NS,K)
+!
+!      IF(IPRINT.EQ.1)WRITE(23,101)NS,NPMAX,NPKADD,IRANK
+      SUM2=0.0
+      DO I=1,NPKADD
+!      IF(IPRINT.EQ.1)WRITE(23,102)I,WVEC2(I)
+        SUM2=SUM2+ABS(WVEC2(I))
+      END DO
+      YPER2=0.0
+      IZULU=MIN(NPKADD,10)
+      DO I=1,IZULU
+        XPER2=(ABS(WVEC2(I))/SUM2)*100.0
+        YPER2=YPER2+XPER2
+!      IF(IPRINT.EQ.1)WRITE(23,102)I,WVEC2(I),XPER2,YPER2
+!      IF(IPRINT.EQ.1)WRITE(*,102)I,WVEC2(I),XPER2,YPER2
+      END DO
+      DEALLOCATE(XCOL)
+      DEALLOCATE(XROW)
+      DEALLOCATE(KROW)
+      DEALLOCATE(FV1)
+      DEALLOCATE(FV2)
+      DEALLOCATE(XAGREE)
+      DEALLOCATE(ROWMEAN)
+      DEALLOCATE(YCENTER)
+      DEALLOCATE(VVV)
+      DEALLOCATE(WORK)
+      DEALLOCATE(IWORK)
+      RETURN
+      END
+!
+!
+!  *************************************************************************
+!   SUBROUTINE KPWHOOPE---IMPLEMENTS THE CONDITIONAL GLOBAL MINIMUM ALGORITHM
+!   DEVELOPED BY POOLE, "LEAST SQUARES METRIC, UNIDIMENSIONAL UNFOLDING,"
+!   PSYCHOMETRIKA, 1984.
+!  *************************************************************************
+!
+!
+      SUBROUTINE KPWHOOPE(NUMMEMBERS,NPMAX,NP,NS,DSTAR,ZZZ,XX,&
+                                           SSE1,SSE2,KTP,IPRINT)
+      IMPLICIT DOUBLE PRECISION(A-H,O-Z)
+      DIMENSION DSTAR(NPMAX,NPMAX),ZZZ(NUMMEMBERS),XX(NUMMEMBERS,25)
+      DOUBLE PRECISION SUM
+!
+      DOUBLE PRECISION, ALLOCATABLE :: DAT(:)
+      DOUBLE PRECISION, ALLOCATABLE :: SAVEZ(:)
+      DOUBLE PRECISION, ALLOCATABLE :: SAVED(:)
+      DOUBLE PRECISION, ALLOCATABLE :: XXXX(:,:)
+      ALLOCATE(SAVEZ(NP))
+      ALLOCATE(SAVED(NP))
+      ALLOCATE(XXXX(NP,25))
+      ALLOCATE(DAT(20))
+!
+!  100 FORMAT(I4,3F12.5,I8)
+      IF(IPRINT.EQ.1) IPRINT=1  !hack to get rid of warnings
+      IF(NS.EQ.1) NS=1  !hack to get rid of warnings
+      KTP=1
+      NPQ=NP-1
+      CALL STATKP(NUMMEMBERS,NPMAX,NP,NS,DSTAR,ZZZ,XX,SSE1,RRSQ,KK)
+      DAT(1)=SSE1
+      II=0
+      AKKK=0.0
+!      IF(IPRINT.EQ.1)WRITE(23,100)II,SSE1,RRSQ,AKKK,KK
+      IF(SSE1.LE.0.001)SSE2=0.0
+      IF(SSE1.LE.0.001) THEN
+        DEALLOCATE(SAVEZ)
+        DEALLOCATE(SAVED)
+        DEALLOCATE(XXXX)
+        DEALLOCATE(DAT)
+        RETURN
+      ENDIF
+      DO II=1,10
+        KTP=II
+        DO J=1,NP
+          NPJ=J
+          KK=0
+          DO JJ=1,NP
+            IF(JJ.EQ.NPJ)GO TO 918
+            KK=KK+1
+            DO K=1,NS
+              XXXX(KK,K)=XX(JJ,K)
+            END DO
+            SAVEZ(KK)=ZZZ(JJ)
+            SAVED(KK)=DSTAR(NPJ,JJ)
+ 918        CONTINUE
+          END DO
+          IF(NS.EQ.1)CALL KPFOCUSW(NUMMEMBERS,NPMAX,NP,NPQ,NPJ,SAVED,&
+                                                             SAVEZ,ZZZ)
+          IF(NS.GT.1)CALL KPFOCUS(NUMMEMBERS,NPMAX,NP,NPQ,NS,NPJ,SAVED,&
+                                                               XX,XXXX)
+        END DO
+        CALL STATKP(NUMMEMBERS,NPMAX,NP,NS,DSTAR,ZZZ,XX,SSE2,RRSQ,KK)
+        DAT(II+1)=SSE2
+        IF(SSE2.EQ.0.0)GO TO 9998
+        AKKK=(DAT(II)-DAT(II+1))/DAT(II)
+!      IF(IPRINT.EQ.1)WRITE(23,100)II,SSE2,RRSQ,AKKK,KK
+        IF(AKKK.LE..001)GO TO 9998
+      END DO
+ 9998 CONTINUE
+      SUM=0.0
+      DO I=1,NP
+        SUM=SUM+ZZZ(I)
+      END DO
+      DO I=1,NP
+        ZZZ(I)=ZZZ(I)-(SUM/FLOAT(NP))
+      END DO
+      DEALLOCATE(SAVEZ)
+      DEALLOCATE(SAVED)
+      DEALLOCATE(XXXX)
+      DEALLOCATE(DAT)
+      RETURN
+      END
+!
+!
+!  *********************************************************************
+!    SUBROUTINE KPFOCUSW---PERFORMS LEAST SQUARES METRIC SIMILARITIES
+!    ANALYSIS USING THE CONDITIONAL GLOBAL MINIMUM ALGORITHM
+!  *********************************************************************
+!
+!
+      SUBROUTINE KPFOCUSW(NUMMEMBERS,NPMAX,NPT,NP,II,D,X,Z)
+      IMPLICIT DOUBLE PRECISION(A-H,O-Z)
+      DIMENSION D(NPT),X(NPT),Z(NUMMEMBERS)
+!
+      INTEGER, ALLOCATABLE :: LL(:)
+      DOUBLE PRECISION, ALLOCATABLE :: Q(:)
+      DOUBLE PRECISION, ALLOCATABLE :: XX(:,:)
+      ALLOCATE ( LL(NPT) )
+      ALLOCATE ( Q(NPT) )
+      ALLOCATE ( XX(NPT,2) )
+!
+      KPDUDE=NPMAX
+      DO I=1,NP
+        LL(I)=I
+        Q(I)=X(I)
+      END DO
+      CALL KPRSORT(Q,NP,LL)
+      ASUM=0.0
+      BSUM=0.0
+      WWSUM=0.0
+      DO I=1,NP
+        IF(D(LL(I)).EQ.99.0)GO TO 66
+        XX(I,1)=Q(I)-D(LL(I))
+        XX(I,2)=Q(I)+D(LL(I))
+        WWSUM=WWSUM+1.0
+        ASUM=ASUM+XX(I,1)
+        BSUM=BSUM+XX(I,1)**2
+ 66     CONTINUE
+      END DO
+      AA=WWSUM*BSUM-ASUM*ASUM
+      KK=1
+      DO I=1,NP
+        IF(D(LL(I)).EQ.99.0)GO TO 77
+        ASUM=ASUM-XX(I,1)+XX(I,2)
+        BSUM=BSUM-XX(I,1)**2+XX(I,2)**2
+        BB=WWSUM*BSUM-ASUM*ASUM
+        CC=MIN(AA,BB)
+        IF(ABS(CC-AA).LE..00001.AND.KK.GT.1)GO TO 88
+        IF(ABS(CC-AA).LE..00001.AND.KK.EQ.1)Z(II)= &
+                             (ASUM+XX(I,1)-XX(I,2))/WWSUM
+        IF(ABS(CC-BB).LE..00001)Z(II)=ASUM/WWSUM
+ 88     AA=CC
+        KK=KK+1
+ 77     CONTINUE
+      END DO
+      DEALLOCATE (LL)
+      DEALLOCATE (Q)
+      DEALLOCATE (XX)
+      RETURN
+      END
+!
+!
+!
+!  **********************************************************************
+!     SUBROUTINE STATKP--COMPUTES THE SUM OF SQUARED ERROR BETWEEN THE
+!         THE INPUT DISTANCE MATRIX AND THE CURRENT DISTANCE MATRIX.
+!  **********************************************************************
+!
+!
+      SUBROUTINE STATKP(NUMMEMBERS,NPMAX,NP,NS,DSTAR,ZZZ,XX,SSE,&
+                                    RRSQ,KK)
+      IMPLICIT DOUBLE PRECISION(A-H,O-Z)
+      DIMENSION DSTAR(NPMAX,NPMAX),ZZZ(NUMMEMBERS),XX(NUMMEMBERS,25)
+!
+!  100 FORMAT(2I5)
+!  125 FORMAT(I4,10F7.3)
+      SSE=0.0
+      ASUM=0.0
+      BSUM=0.0
+      CSUM=0.0
+      DSUM=0.0
+      ESUM=0.0
+      KK=0
+      DO I=1,NP
+        DO J=1,I
+          IF(I.EQ.J)GO TO 2
+          IF(DSTAR(I,J).EQ.99.0)GO TO 2
+          KK=KK+1
+          IF(NS.EQ.1)AA=ABS(ZZZ(I)-ZZZ(J))
+          IF(NS.EQ.1)GO TO 10
+          SSUMS=0.0
+          DO K=1,NS
+            SSUMS=SSUMS+(XX(I,K)-XX(J,K))**2
+          END DO
+          SSUMS=SQRT(SSUMS)
+          AA=SSUMS
+ 10       CONTINUE
+          ASUM=ASUM+AA
+          BSUM=BSUM+DSTAR(I,J)
+          CSUM=CSUM+AA*AA
+          DSUM=DSUM+DSTAR(I,J)**2
+          ESUM=ESUM+AA*DSTAR(I,J)
+          SSE=SSE+(DSTAR(I,J)-AA)**2
+ 2        CONTINUE
+        END DO
+      END DO
+      AA=FLOAT(KK)*ESUM-ASUM*BSUM
+      BB=FLOAT(KK)*CSUM-ASUM*ASUM
+      CC=FLOAT(KK)*DSUM-BSUM*BSUM
+      RRSQ=(AA*AA)/(BB*CC)
+      RETURN
+      END
+!
+!
+!  *********************************************************************
+!    SUBROUTINE KPFOCUS IS A QUASI-GRADIENT ALGORITHM.  IT COMPUTES THE
+!    COORDINATES
+!  *********************************************************************
+!
+!
+      SUBROUTINE KPFOCUS(NUMMEMBERS,NPMAX,NP,NPQ,NS,II,D,XX,XXXX)
+      IMPLICIT DOUBLE PRECISION(A-H,O-Z)
+      DIMENSION D(NP),XX(NUMMEMBERS,25),XXXX(NP,25)
+      DOUBLE PRECISION, ALLOCATABLE :: ZZZ(:)
+      ALLOCATE(ZZZ(100))
+      KPDUDE=NPMAX
+      DO J=1,NS
+        ZZZ(J)=0.0
+      END DO
+      KK=0
+      DO J=1,NPQ
+        IF(D(J).EQ.99.0)GO TO 4
+        KK=KK+1
+        SUM=0.0
+        DO K=1,NS
+          SUM=SUM+(XXXX(J,K)-XX(II,K))**2
+        END DO
+        IF(SUM.LE..00001)THEN
+           XC=1.0
+           GO TO 52
+        ENDIF
+        XC=D(J)/SQRT(SUM)
+ 52     CONTINUE
+        DO K=1,NS
+          ZZZ(K)=ZZZ(K)+XXXX(J,K)+XC*(XX(II,K)-XXXX(J,K))
+        END DO
+ 4      CONTINUE
+      END DO
+!      IF(KK.EQ.0)WRITE(23,310)II
+!      IF(KK.EQ.0)STOP
+!  310 FORMAT(' THIS IS YOUR PROBLEM STUPID!!!',I6)
+      DO K=1,NS
+        XX(II,K)=ZZZ(K)/FLOAT(KK)
+      END DO
+      DEALLOCATE(ZZZ)
+      RETURN
+      END
+!
+!
+!
+!  ************************************************************************
+!    SUBROUTINE KPRSORT --SORTS A VECTOR 'A' OF REAL ELEMENTS INTO ASCENDING
+!    ORDER.  'LA' IS THE NUMBER OF ELEMENTS TO BE SORTED AND 'IR' IS A
+!    VECTOR OF INTEGERS THAT RECORDS THE PERMUTATIONS--USUALLY SET TO
+!    1,2,3,4,...
+!  ************************************************************************
+!
+!
+      SUBROUTINE KPRSORT(A,LA,IR)
+      IMPLICIT DOUBLE PRECISION(A-H,O-Z)
+      DIMENSION A(LA),IU(21),IL(21),IR(LA)
+      IF (LA.LE.0) RETURN
+      M = 1
+      I = 1
+      J = LA
+      R = .375
+ 5    IF (I.EQ.J) GO TO 45
+      IF (R.GT..5898437) GO TO 10
+      R = R+3.90625E-2
+      GO TO 15
+ 10   R = R-.21875
+ 15   K = I
+!
+! SELECT A CENTRAL ELEMENT OF THE
+! ARRAY AND SAVE IT IN LOCATION T
+!
+      IJ = idint(I+(J-I)*R)
+      T = A(IJ)
+      IT = IR(IJ)
+!
+! FIRST ELEMENT OF ARRAY IS GREATER
+! THAN T, INTERCHANGE WITH T
+!
+      IF (A(I).LE.T) GO TO 20
+      A(IJ) = A(I)
+      A(I) = T
+      T = A(IJ)
+      IR(IJ) = IR(I)
+      IR(I) = IT
+      IT = IR(IJ)
+ 20   L = J
+!
+! IF LAST ELEMENT OF ARRAY IS LESS THAN
+! T, INTERCHANGE WITH T
+!
+      IF (A(J).GE.T) GO TO 30
+      A(IJ) = A(J)
+      A(J) = T
+      T = A(IJ)
+      IR(IJ) = IR(J)
+      IR(J) = IT
+      IT = IR(IJ)
+!
+! IF FIRST ELEMENT OF ARRAY IS GREATER
+! THAN T, INTERCHANGE WITH T
+!
+      IF (A(I).LE.T) GO TO 30
+      A(IJ) = A(I)
+      A(I) = T
+      T = A(IJ)
+      IR(IJ) = IR(I)
+      IR(I) = IT
+      IT = IR(IJ)
+      GO TO 30
+ 25   IF (A(L).EQ.A(K)) GO TO 30
+      TT = A(L)
+      A(L) = A(K)
+      A(K) = TT
+      ITT = IR(L)
+      IR(L) = IR(K)
+      IR(K) = ITT
+!
+! FIND AN ELEMENT IN THE SECOND HALF OF
+! THE ARRAY WHICH IS SMALLER THAN T
+!
+ 30   L = L-1
+      IF (A(L).GT.T) GO TO 30
+!
+! FIND AN ELEMENT IN THE FIRST HALF OF
+! THE ARRAY WHICH IS GREATER THAN T
+!
+ 35   K = K+1
+      IF (A(K).LT.T) GO TO 35
+!
+! INTERCHANGE THESE ELEMENTS
+!
+      IF (K.LE.L) GO TO 25
+!
+! SAVE UPPER AND LOWER SUBSCRIPTS OF
+! THE ARRAY YET TO BE SORTED
+!
+      IF (L-I.LE.J-K) GO TO 40
+      IL(M) = I
+      IU(M) = L
+      I = K
+      M = M+1
+      GO TO 50
+ 40   IL(M) = K
+      IU(M) = J
+      J = L
+      M = M+1
+      GO TO 50
+!
+! BEGIN AGAIN ON ANOTHER PORTION OF
+! THE UNSORTED ARRAY
+!
+ 45   M = M-1
+      IF (M.EQ.0) RETURN
+      I = IL(M)
+      J = IU(M)
+ 50   IF (J-I.GE.11) GO TO 15
+      IF (I.EQ.1) GO TO 5
+      I = I-1
+ 55   I = I+1
+      IF (I.EQ.J) GO TO 45
+      T = A(I+1)
+      IT = IR(I+1)
+      IF (A(I).LE.T) GO TO 55
+      K = I
+ 60   A(K+1) = A(K)
+      IR(K+1) = IR(K)
+      K = K-1
+      IF (T.LT.A(K)) GO TO 60
+      A(K+1) = T
+      IR(K+1) = IT
+      GO TO 55
+      END
+!
+! *********************************************************************
+!   SUBROUTINE KPCUTPLANE -- FINDS CUTTING LINE USING THE CUTTING
+!                            PLANE PROCEDURE
+! *********************************************************************
+!
+!
+      SUBROUTINE KPCUTPLANE(NUMMEMBERS,NUMVOTES,&
+                            JJJ,NP,NRCALL,NS,NDUAL,XMAT,ZVEC,WS, &
+                            MCUTS,LERROR,IFIXX,KTT,KT,LDATA,IPRINT)
+      IMPLICIT DOUBLE PRECISION(A-H,O-Z)
+      DIMENSION XMAT(NUMMEMBERS,25),ZVEC(NUMVOTES,25),WS(NDUAL), &
+                LERROR(NUMMEMBERS,NUMVOTES),&
+                MCUTS(NUMVOTES,2),LDATA(NUMMEMBERS,NUMVOTES)
+!
+      DOUBLE PRECISION, ALLOCATABLE :: XJCH(:)
+      DOUBLE PRECISION, ALLOCATABLE :: XJEH(:)
+      DOUBLE PRECISION, ALLOCATABLE :: XJCL(:)
+      DOUBLE PRECISION, ALLOCATABLE :: XJEL(:)
+      DOUBLE PRECISION, ALLOCATABLE :: XPROJ(:,:)
+      DOUBLE PRECISION, ALLOCATABLE :: XXY(:)
+      DOUBLE PRECISION, ALLOCATABLE :: XXX(:)
+      DOUBLE PRECISION, ALLOCATABLE :: ZS(:)
+      INTEGER, ALLOCATABLE :: LLL(:)
+      INTEGER, ALLOCATABLE :: MM(:)
+      INTEGER, ALLOCATABLE :: MVOTE(:)
+      INTEGER, ALLOCATABLE :: LLV(:)
+      INTEGER, ALLOCATABLE :: LLVB(:)
+      INTEGER, ALLOCATABLE :: LLE(:)
+      INTEGER, ALLOCATABLE :: LLEB(:)
+      INTEGER, ALLOCATABLE :: LCERROR(:,:)
+      ALLOCATE(XJCH(25))
+      ALLOCATE(XJEH(25))
+      ALLOCATE(XJCL(25))
+      ALLOCATE(XJEL(25))
+      ALLOCATE(XPROJ(NUMMEMBERS,NUMVOTES))
+      ALLOCATE(XXY(NP))
+      ALLOCATE(XXX(NDUAL))
+      ALLOCATE(LLL(NDUAL))
+      ALLOCATE(MM(NDUAL))
+      ALLOCATE(MVOTE(NDUAL))
+      ALLOCATE(LLV(NDUAL))
+      ALLOCATE(LLVB(NDUAL))
+      ALLOCATE(LLE(NDUAL))
+      ALLOCATE(LLEB(NDUAL))
+      ALLOCATE(LCERROR(NP,NRCALL))
+      ALLOCATE(ZS(NDUAL))
+!
+!  100 FORMAT(5I5)
+!  101 FORMAT(7I4,2F10.4)
+! 1010 FORMAT(' WHOA DUDE! THESE DO NOT MATCH!')
+! 1093 FORMAT(' CLASSIFICATION CHECK  ',I3,4I8)
+! 1094 FORMAT(' RC  CLASSIFICATION ERROR  ',2I3,2I8,2F10.5)
+! 1118 FORMAT(7I4,F7.3,3I4)
+      CALL ECHOEVENT(11)
+      CALL FLUSHCON()
+      CALL PROCEVENT()
+      NCUT=25
+      IF(IPRINT.EQ.1) IPRINT=1  !hack to get rid of warnings
+      IF(IFIXX.EQ.1) IFIXX=1  !hack to get rid of warnings
+!
+!   ESTIMATE PROJECTION VECTORS
+!
+      IF(JJJ.EQ.1)THEN
+         DO JX=1,NRCALL
+           DO I=1,NP
+             LERROR(I,JX)=0
+           END DO
+         END DO
+      ENDIF
+      KCHECK4=0
+      DO JX=1,NRCALL
+        DO I=1,NP
+          LCERROR(I,JX)=LERROR(I,JX)
+          IF(LDATA(I,JX).EQ.0)GO TO 283
+          KCHECK4=KCHECK4+LERROR(I,JX)
+ 283      CONTINUE
+        END DO
+      END DO
+!
+      KT=0
+      KTT=0
+      KTTSAVE=0
+      KTSAVE=0
+      KCHECK=0
+      DO JX=1,NRCALL
+!
+!  GET YES AND NO COUNTS
+!
+        KYES=0
+        KNO=0
+        DO I=1,NP
+          IF(LDATA(I,JX).EQ.1)KYES=KYES+1
+          IF(LDATA(I,JX).EQ.6)KNO=KNO+1
+        END DO
+!
+        DO I=1,NP
+          SUM=0.0
+          DO K=1,NS
+            SUM=SUM+XMAT(I,K)*ZVEC(JX,K)
+          END DO
+!
+!  SAVE PROJECTION VECTORS -- LEGISLATOR BY ROLL CALL MATRIX
+!
+          XPROJ(I,JX)=SUM
+          XXY(I)=SUM
+          LLL(I)=I
+          XXX(I)=SUM
+          MM(I)=LDATA(I,JX)
+          IF(LDATA(I,JX).EQ.0)MM(I)=9
+        END DO
+!
+!  SORT PROJECTION VECTOR (Y-HAT)
+!
+        CALL KPRSORT(XXX,NP,LLL)
+        DO I=1,NP
+          MVOTE(I)=MM(LLL(I))
+        END DO
+!
+!
+!  CALCULATE CLASSIFICATION ERRORS OF PROJECTION ONTO NORMAL VECTOR
+!
+!
+        JCH=0
+        JEH=0
+        JCL=0
+        JEL=0
+        IROTC=0
+        CALL JAN1PT(NUMMEMBERS,NUMVOTES,&
+                    NP,NRCALL,NP,NRCALL,NS,NDUAL,JX,XMAT,XXX,MVOTE,WS, &
+                    LLV,LLVB,LLE,LLEB,LERROR, &
+                    ZS,JCH,JEH,JCL,JEL,IROTC,KCUT,LCUT,LLL, &
+                    XJCH,XJEH,XJCL,XJEL)
+!
+!      IF(IPRINT.EQ.1)WRITE(*,3909)JX,KYES,KNO,JCH,JCL,JEH,JEL, &
+!                      KCUT,LCUT,(ZVEC(JX,K),K=1,NS),WS(JX)
+! 3909 FORMAT(I3,'***',6I4,2I2,10F7.3)
+        IF(JEH+JEL.EQ.0)THEN
+           KT=KT+JCH+JEH+JCL+JEL
+           KTSAVE=KTSAVE+JCH+JEH+JCL+JEL
+           KITTY1=0
+           KITTY2=JCH+JEH+JCL+JEL
+           IJUST=0
+           GO TO 9377
+        ENDIF
+!
+!  SET-UP FOR GRID SEARCH FOR BEST CUTTING LINE
+!
+        CALL KPSEARCH(NUMMEMBERS,NUMVOTES,&
+                      JX,NCUT,NS,NP,NRCALL,NDUAL,KCUT,LCUT,KTT,KT, &
+                    XMAT,ZVEC,XPROJ,WS,XXY, &
+                    KITTY1,KITTY2,KYES,KNO,LDATA,LERROR,IPRINT)
+!
+        KTTSAVE=KTTSAVE+KITTY1
+        KTSAVE=KTSAVE+KITTY2
+!
+ 9377   CONTINUE
+!
+!  STORE DIRECTIONALITY OF ROLL CALL
+!
+        MCUTS(JX,1)=KCUT
+        MCUTS(JX,2)=LCUT
+!
+!
+!  LOCATE ERRORS -- WS(.) CONTAINS THE OPTIMAL CUTTING POINT ON THE
+!                   PROJECTION VECTOR -- IT CAN BE USED TO CALCULATE THE
+!                   CLASSIFICATION ERRORS
+!
+        KSUM=0
+        DO I=1,NP
+          LERROR(I,JX)=0
+          XXX(I)=XXY(I)
+          LLL(I)=I
+          IF(LDATA(I,JX).EQ.0)GO TO 108
+          IF(XXY(I).LT.WS(JX))THEN
+             IF(LDATA(I,JX).NE.KCUT)THEN
+                LERROR(I,JX)=1
+                KCHECK=KCHECK+1
+                KSUM=KSUM+1
+             ENDIF
+          ENDIF
+          IF(XXY(I).GT.WS(JX))THEN
+             IF(LDATA(I,JX).NE.LCUT)THEN
+                LERROR(I,JX)=1
+                KCHECK=KCHECK+1
+                KSUM=KSUM+1
+             ENDIF
+          ENDIF
+ 108      CONTINUE
+        END DO
+!      IF(KSUM.NE.KITTY1)THEN
+!         IF(IPRINT.EQ.1)WRITE(11,1010)
+!      ENDIF
+        KXERROR=KITTY1
+        JXERROR=KITTY1
+        SAVEWS=WS(JX)
+        XINC=0.2
+        CALL KPRSEARCH(NUMMEMBERS,NUMVOTES,&
+                       NP,NRCALL,NS,NDUAL,XINC,JX,NCUT,KPCUT,LPCUT, &
+                     XMAT,ZVEC,WS,KDOWN,KEQUAL,KUP,JXERROR,WSNEW, &
+                     LDATA,LERROR)
+        
+        IF(JXERROR.EQ.KXERROR)THEN
+           WS(JX)=SAVEWS
+        ENDIF
+!
+!  RESET LERROR(,)
+!
+        IF(JXERROR.LT.KXERROR)THEN
+           KTTSAVE=KTTSAVE-KITTY1+JXERROR
+           WS(JX)=WSNEW
+           SAVEWS=WS(JX)
+           MCUTS(JX,1)=KPCUT
+           MCUTS(JX,2)=LPCUT
+           KCHECK3=0
+           DO I=1,NP
+             SUMI=0.0
+             DO K=1,NS
+               SUMI=SUMI+XMAT(I,K)*ZVEC(JX,K)
+             END DO
+             KCUT=MCUTS(JX,1)
+             LCUT=MCUTS(JX,2)
+             LERROR(I,JX)=0
+             IF(LDATA(I,JX).EQ.0)GO TO 191
+             IF(SUMI.LT.WS(JX))THEN
+                IF(LDATA(I,JX).NE.KCUT)THEN
+                   LERROR(I,JX)=1
+                   KCHECK3=KCHECK3+1
+                ENDIF
+             ENDIF
+             IF(SUMI.GT.WS(JX))THEN
+                IF(LDATA(I,JX).NE.LCUT)THEN
+                   LERROR(I,JX)=1
+                   KCHECK3=KCHECK3+1
+                ENDIF
+             ENDIF
+ 191         CONTINUE
+           END DO
+           KXERROR=JXERROR
+        ENDIF
+!
+        IF(JXERROR.GE.KXERROR)THEN
+           KCHECK33=0
+           DO I=1,NP
+             SUMI=0.0
+             DO K=1,NS
+               SUMI=SUMI+XMAT(I,K)*ZVEC(JX,K)
+             END DO
+             KCUT=MCUTS(JX,1)
+             LCUT=MCUTS(JX,2)
+             LERROR(I,JX)=0
+             IF(LDATA(I,JX).EQ.0)GO TO 391
+             IF(SUMI.LT.WS(JX))THEN
+                IF(LDATA(I,JX).NE.KCUT)THEN
+                   LERROR(I,JX)=1
+                   KCHECK33=KCHECK33+1
+                ENDIF
+             ENDIF
+             IF(SUMI.GT.WS(JX))THEN
+                IF(LDATA(I,JX).NE.LCUT)THEN
+                   LERROR(I,JX)=1
+                   KCHECK33=KCHECK33+1
+                ENDIF
+             ENDIF
+ 391         CONTINUE
+           END DO
+        ENDIF
+!
+!      WRITE(38,1118)JX,JJJ,KYES,KNO,KITTY1,JXERROR,KCHECK3,
+!     C                XINC,KDOWN,KEQUAL,KUP
+      END DO
+!
+      KT=KTSAVE
+      KTT=KTTSAVE
+      KCHECK2=0
+      KCHECK22=0
+      DO I=1,NP
+        DO JX=1,NRCALL
+          IF(LDATA(I,JX).EQ.0)GO TO 281
+          KCHECK2=KCHECK2+LERROR(I,JX)
+          KCHECK22=KCHECK22+LCERROR(I,JX)
+ 281      CONTINUE
+        END DO
+      END DO
+!      IF(IPRINT.EQ.1)THEN
+!         WRITE(23,1093)NS,KCHECK,KCHECK2,KCHECK22,KCHECK4
+!      ENDIF
+      IF(KT.GT.0)THEN
+        XERROR=FLOAT(KTT)/FLOAT(KT)
+        YERROR=1.0-XERROR
+      ENDIF
+!      IF(IPRINT.EQ.1)WRITE(23,1094)JJJ,NS,KTT,KT,XERROR,YERROR
+      DEALLOCATE(XJCH)
+      DEALLOCATE(XJEH)
+      DEALLOCATE(XJCL)
+      DEALLOCATE(XJEL)
+      DEALLOCATE(XPROJ)
+      DEALLOCATE(XXY)
+      DEALLOCATE(XXX)
+      DEALLOCATE(LLL)
+      DEALLOCATE(MM)
+      DEALLOCATE(MVOTE)
+      DEALLOCATE(LLV)
+      DEALLOCATE(LLVB)
+      DEALLOCATE(LLE)
+      DEALLOCATE(LLEB)
+      DEALLOCATE(LCERROR)
+      DEALLOCATE(ZS)
+      RETURN
+      END
+!
+!  ************************************************************************
+!    SUBROUTINE KPSEARCH
+!  ************************************************************************
+!
+      SUBROUTINE KPSEARCH(NUMMEMBERS,NUMVOTES,&
+                        JX,NCUT,NS,NP,NRCALL,NDUAL,KCUT,LCUT, &
+                        KTT,KT,XMAT,ZVEC,XPROJ,WS,XXY, &
+                        KITTY1,KITTY2,KYES,KNO,LDATA, &
+                        LERROR,IPRINT)
+      IMPLICIT DOUBLE PRECISION(A-H,O-Z)
+      DIMENSION XMAT(NUMMEMBERS,25),ZVEC(NUMVOTES,25),&
+                LERROR(NUMMEMBERS,NUMVOTES),&
+                XPROJ(NUMMEMBERS,NUMVOTES),WS(NDUAL),XXY(NP),&
+                LDATA(NUMMEMBERS,NUMVOTES)
+      DOUBLE PRECISION SUM
+!
+      INTEGER, ALLOCATABLE :: KKKCUT(:)
+      INTEGER, ALLOCATABLE :: LLLCUT(:)
+      INTEGER, ALLOCATABLE :: LLV(:)
+      INTEGER, ALLOCATABLE :: LLVB(:)
+      INTEGER, ALLOCATABLE :: LLE(:)
+      INTEGER, ALLOCATABLE :: LLEB(:)
+      INTEGER, ALLOCATABLE :: LWRONG(:)
+      INTEGER, ALLOCATABLE :: LLL(:)
+      INTEGER, ALLOCATABLE :: MVOTE(:)
+      INTEGER, ALLOCATABLE :: LLM(:)
+      INTEGER, ALLOCATABLE :: LLN(:)
+      INTEGER, ALLOCATABLE :: MM(:)
+      DOUBLE PRECISION, ALLOCATABLE :: XJCH(:)
+      DOUBLE PRECISION, ALLOCATABLE :: XJEH(:)
+      DOUBLE PRECISION, ALLOCATABLE :: XJCL(:)
+      DOUBLE PRECISION, ALLOCATABLE :: XJEL(:)
+      DOUBLE PRECISION, ALLOCATABLE :: ZS(:)
+      DOUBLE PRECISION, ALLOCATABLE :: FV1(:)
+      DOUBLE PRECISION, ALLOCATABLE :: FV2(:)
+      DOUBLE PRECISION, ALLOCATABLE :: SUMX(:)
+      DOUBLE PRECISION, ALLOCATABLE :: UUUU(:,:)
+      DOUBLE PRECISION, ALLOCATABLE :: XXX(:)
+      DOUBLE PRECISION, ALLOCATABLE :: IWORK(:)
+      DOUBLE PRECISION, ALLOCATABLE ::  Y16MIDP(:,:)
+      DOUBLE PRECISION, ALLOCATABLE ::  YHAT(:)
+      DOUBLE PRECISION, ALLOCATABLE ::  Z16MIDP(:,:)
+      DOUBLE PRECISION, ALLOCATABLE ::  VVV(:,:)
+      DOUBLE PRECISION, ALLOCATABLE ::  WORK(:)
+      DOUBLE PRECISION, ALLOCATABLE ::  X16MIDP(:,:)
+      ALLOCATE(KKKCUT(NDUAL))
+      ALLOCATE(LLLCUT(NDUAL))
+      ALLOCATE(LLV(NDUAL))
+      ALLOCATE(LLVB(NDUAL))
+      ALLOCATE(LLE(NDUAL))
+      ALLOCATE(LLEB(NDUAL))
+      ALLOCATE(LWRONG(NDUAL))
+      ALLOCATE(LLL(NDUAL))
+      ALLOCATE(MVOTE(NDUAL))
+      ALLOCATE(LLM(NDUAL))
+      ALLOCATE(LLN(NDUAL))
+      ALLOCATE(MM(NDUAL))
+      ALLOCATE(XJCH(25))
+      ALLOCATE(XJEH(25))
+      ALLOCATE(XJCL(25))
+      ALLOCATE(XJEL(25))
+      ALLOCATE(ZS(NDUAL))
+      ALLOCATE(FV1(NDUAL))
+      ALLOCATE(FV2(NDUAL))
+      ALLOCATE(SUMX(NDUAL))
+      ALLOCATE(UUUU(NDUAL,25))
+      ALLOCATE(XXX(NDUAL))
+      ALLOCATE(IWORK(200))
+      ALLOCATE(Y16MIDP(NDUAL,25))
+      ALLOCATE(YHAT(NDUAL))
+      ALLOCATE(Z16MIDP(NDUAL,25))
+      ALLOCATE(VVV(25,25))
+      ALLOCATE(WORK(2*NUMMEMBERS+1875))
+      ALLOCATE(X16MIDP(NDUAL,25))
+!
+!  104 FORMAT(I5,10F10.4)
+!  210 FORMAT(I5,10F12.3)
+! 1091 FORMAT(' INVERSE MATRIX ERROR',I4,I5,I8,2F10.4)
+! 1099 FORMAT(I3,I5,I3,2I4)
+! 1103 FORMAT(' MIDPOINT DECOMPOSITION',5I6)
+! 1212 FORMAT(I3,I5,7I4)
+! 3909 FORMAT(I5,I3,6I4,2I8,5I5)
+!
+      IF(KNO.EQ.1) KNO=1  !hack to get rid of warnings
+      IF(IPRINT.EQ.1) IPRINT=1  !hack to get rid of warnings
+      IF(KYES.EQ.1) KYES=1  !hack to get rid of warnings
+      DO I=1,50
+        SUMX(I)=0.0
+      END DO
+!
+!  PHASE 2
+!
+!      NCUT2=20
+!
+      DO IJL=1,NCUT
+!
+!  SET-UP FOR PHASE 2
+!
+!
+        DO K=1,NS
+          UUUU(IJL,K)=ZVEC(JX,K)
+        END DO
+        DO I=1,NP
+          SUM=0.0
+          DO K=1,NS
+            SUM=SUM+XMAT(I,K)*ZVEC(JX,K)
+          END DO
+!
+!  SAVE PROJECTION VECTORS -- LEGISLATOR BY ROLL CALL MATRIX
+!
+          XPROJ(I,JX)=SUM
+          XXY(I)=SUM
+          LLL(I)=I
+          XXX(I)=SUM
+          MM(I)=LDATA(I,JX)
+          IF(LDATA(I,JX).EQ.0)MM(I)=9
+        END DO
+!
+!  SORT PROJECTION VECTOR (Y-HAT)
+!
+!
+        CALL KPRSORT(XXX,NP,LLL)
+        DO I=1,NP
+          MVOTE(I)=MM(LLL(I))
+        END DO
+!
+!
+!  CALCULATE CLASSIFICATION ERRORS FOR BEST SOLUTION FROM PHASE 1
+!
+!
+        JCH=0
+        JEH=0
+        JCL=0
+        JEL=0
+        IROTC=0
+        CALL JAN1PT(NUMMEMBERS,NUMVOTES,&
+                    NP,NRCALL,NP,NRCALL,NS,NDUAL,JX,XMAT,XXX,MVOTE,WS, &
+                    LLV,LLVB,LLE,LLEB,LERROR, &
+                    ZS,JCH,JEH,JCL,JEL,IROTC,KCUT,LCUT,LLL, &
+                    XJCH,XJEH,XJCL,XJEL)
+!
+!      IF(IPRINT.EQ.1)WRITE(11,3909)JX,IJL,KYES,KNO,JCH,JCL,JEH,JEL
+!
+        LLM(IJL)=IJL
+        LLN(IJL)=JEH+JEL
+        FV1(IJL)=FLOAT(JEH+JEL)
+        FV2(IJL)=WS(JX)
+        KKKCUT(IJL)=KCUT
+        LLLCUT(IJL)=LCUT
+!
+        IF(JEH+JEL.EQ.0)THEN
+           KT=KT+JCH+JCL+JEH+JEL
+           KITTY1=0
+           KITTY2=JCH+JCL+JEH+JEL
+           IJUST=2
+           DEALLOCATE(KKKCUT)
+           DEALLOCATE(LLLCUT)
+           DEALLOCATE(LLV)
+           DEALLOCATE(LLVB)
+           DEALLOCATE(LLE)
+           DEALLOCATE(LLEB)
+           DEALLOCATE(LWRONG)
+           DEALLOCATE(LLL)
+           DEALLOCATE(MVOTE)
+           DEALLOCATE(LLM)
+           DEALLOCATE(LLN)
+           DEALLOCATE(MM)
+           DEALLOCATE(XJCH)
+           DEALLOCATE(XJEH)
+           DEALLOCATE(XJCL)
+           DEALLOCATE(XJEL)
+           DEALLOCATE(ZS)
+           DEALLOCATE(FV1)
+           DEALLOCATE(FV2)
+           DEALLOCATE(SUMX)
+           DEALLOCATE(UUUU)
+           DEALLOCATE(XXX)
+           DEALLOCATE(IWORK)
+           DEALLOCATE(Y16MIDP)
+           DEALLOCATE(YHAT)
+           DEALLOCATE(Z16MIDP)
+           DEALLOCATE(VVV)
+           DEALLOCATE(WORK)
+           DEALLOCATE(X16MIDP)
+           RETURN
+        ENDIF
+!
+!
+        KASTRO=4*(JEH+JEL)
+        IF(KASTRO.LT.4*NS)KASTRO=4*NS
+        IF(KASTRO.GT.NP)KASTRO=NP
+!
+        DO I=1,NP
+          LWRONG(I)=0
+          DB2B1=WS(JX)-XXY(I)
+          IF(XXY(I).LT.WS(JX))THEN
+!
+!  IF CORRECT PLACE LEGISLATOR POINT ON THE CURRENT CUTTING PLANE
+!
+             IF(LDATA(I,JX).EQ.KCUT)THEN
+                DO K=1,NS
+                  Y16MIDP(I,K)=XMAT(I,K)+DB2B1*ZVEC(JX,K)
+                END DO
+             ENDIF
+!
+!  IF INCORRECT PUT ACTUAL POINT INTO THE CUTTING CLOUD
+!
+             IF(LDATA(I,JX).EQ.LCUT)THEN
+                LWRONG(I)=1
+                DO K=1,NS
+                  Y16MIDP(I,K)=XMAT(I,K)
+                END DO
+             ENDIF
+!
+!  IF NOT-VOTING PUT LEGISLATOR POINT ON THE CURRRENT CUTTING PLANE
+!
+             IF(LDATA(I,JX).EQ.0)THEN
+                DO K=1,NS
+                  Y16MIDP(I,K)=XMAT(I,K)+DB2B1*ZVEC(JX,K)
+                END DO
+             ENDIF
+          ENDIF
+          IF(XXY(I).GT.WS(JX))THEN
+!
+!  IF CORRECT PLACE LEGISLATOR POINT ON THE CURRENT CUTTING PLANE
+!
+             IF(LDATA(I,JX).EQ.LCUT)THEN
+                DO K=1,NS
+                  Y16MIDP(I,K)=XMAT(I,K)+DB2B1*ZVEC(JX,K)
+                END DO
+             ENDIF
+!
+!  IF INCORRECT PUT ACTUAL POINT INTO THE CUTTING CLOUD
+!
+             IF(LDATA(I,JX).EQ.KCUT)THEN
+                LWRONG(I)=1
+                DO K=1,NS
+                  Y16MIDP(I,K)=XMAT(I,K)
+                END DO
+             ENDIF
+!
+!  IF NOT-VOTING PUT LEGISLATOR POINT ON THE CURRRENT CUTTING PLANE
+!
+             IF(LDATA(I,JX).EQ.0)THEN
+                DO K=1,NS
+                  Y16MIDP(I,K)=XMAT(I,K)+DB2B1*ZVEC(JX,K)
+                END DO
+             ENDIF
+          ENDIF
+!
+        END DO
+!
+!  MASS CENTER THE CUTTING PLANE MATRIX (Y16MIDP(,) HAS ALL POINTS)
+!
+        DO K=1,NS
+          SUM=0.0
+          DO I=1,NP
+            SUM=SUM+Y16MIDP(I,K)
+          END DO
+          DO I=1,NP
+            Y16MIDP(I,K)=Y16MIDP(I,K)-SUM/FLOAT(NP)
+            SUMX(K)=SUMX(K)+Y16MIDP(I,K)**2
+          END DO
+          SUMX(K)=SUMX(K)/FLOAT(NP)
+        END DO
+!
+!  CONSTRUCT PARTIAL CUTTING PLANE MATRIX (X16MIDP(,))
+!
+        KK=0
+        KHIT=0
+!
+        DO I=1,NP
+          IF(LWRONG(I).EQ.1)THEN
+             KK=KK+1
+             DO K=1,NS
+               X16MIDP(KK,K)=Y16MIDP(I,K)
+             END DO
+          ENDIF
+        END DO
+        DO I=1,NP
+          IF(LWRONG(I).EQ.0)THEN
+             KK=KK+1
+             DO K=1,NS
+               X16MIDP(KK,K)=Y16MIDP(I,K)
+             END DO
+             IF(KK.EQ.KASTRO)GO TO 203
+          ENDIF
+        END DO
+ 203    CONTINUE
+!
+!  MASS CENTER THE PARTIAL CUTTING PLANE MATRIX
+!
+        DO K=1,NS
+          SUM=0.0
+          DO I=1,KASTRO
+            SUM=SUM+X16MIDP(I,K)
+          END DO
+          DO I=1,KASTRO
+            X16MIDP(I,K)=X16MIDP(I,K)-SUM/FLOAT(KASTRO)
+            SUMX(K+NS)=SUMX(K+NS)+X16MIDP(I,K)**2
+          END DO
+          SUMX(K+NS)=SUMX(K+NS)/FLOAT(KASTRO)
+        END DO
+!
+!  RUN REGRESSION TO ELIMINATE DIMENSION WITH LEAST VARIANCE
+!
+!
+!  CALL SINGULAR VALUE DECOMPOSITION ROUTINE
+!
+        LWORK=2*NUMMEMBERS+1875
+        XTOL=.001
+!      CALL LSVRR(NP,NS,Y16MIDP,NP,21,XTOL,IRANK,YHAT,Y16MIDP,
+!     C           NP,VVV,25)
+        CALL DGESDD('S',NP,NS,Y16MIDP,NDUAL,YHAT,Z16MIDP, &
+                   NDUAL,VVV,25,WORK,LWORK,IWORK,IRANK)
+!
+!      WRITE(23,1094)IRANK
+! 1094 FORMAT(' DGESDD ROUTINE',I5)
+!      WRITE(23,3908)JX,IJL,(YHAT(K),K=1,NS),(VVV(K,NS),K=1,NS)
+        DO K=1,NS
+          SUMX(K)=SUMX(K+NS)
+!
+!  WRONG WAY -- DGESDD RETURNS V_transpose, NOT V
+!
+!      ZVEC(JX,K)=VVV(K,NS)
+!
+!  RIGHT WAY -- DGESDD RETURNS V_transpose, NOT V, SO THE
+!               S_th ROW IS TRANSFERRED
+!
+          ZVEC(JX,K)=VVV(NS,K)
+        END DO
+!
+! 3908 FORMAT(I5,I3,10F7.3)
+!
+!
+!  RUN REGRESSION TO ELIMINATE DIMENSION WITH LEAST VARIANCE
+!
+!      CALL LSVRR(KASTRO,NS,X16MIDP,NP,21,XTOL,IRANK,YHAT,X16MIDP,
+!     C           NP,VVV,25)
+        CALL DGESDD('S',KASTRO,NS,X16MIDP,NDUAL,YHAT,Z16MIDP, &
+                   NDUAL,VVV,25,WORK,LWORK,IWORK,IRANK)
+!
+!      WRITE(23,1094)IRANK
+!      WRITE(23,3908)JX,IJL,(YHAT(K),K=1,NS),(VVV(K,NS),K=1,NS)
+        IF(IJL.GT.25)THEN
+           DO K=1,NS
+!
+!  WRONG WAY -- DGESDD RETURNS V_transpose, NOT V
+!
+!         ZVEC(JX,K)=VVV(K,NS)
+!
+!  RIGHT WAY -- DGESDD RETURNS V_transpose, NOT V, SO THE
+!               S_th ROW IS TRANSFERRED
+!
+             ZVEC(JX,K)=VVV(NS,K)
+           END DO
+        ENDIF
+!
+!
+      END DO
+!
+      CALL KPRSORT(FV1,NCUT,LLM)
+!
+      DO JJ=1,NCUT
+        IF(FV1(1).LT.FV1(JJ))GO TO 282
+      END DO
+ 282  KIN=JJ-1
+      LLM(1)=LLM(KIN)
+!
+      DO K=1,NS
+        ZVEC(JX,K)=UUUU(LLM(1),K)
+      END DO
+      WS(JX)=FV2(LLM(1))
+      KCUT=KKKCUT(LLM(1))
+      LCUT=LLLCUT(LLM(1))
+      DO I=1,NP
+        SUM=0.0
+        DO K=1,NS
+          SUM=SUM+XMAT(I,K)*ZVEC(JX,K)
+        END DO
+        XPROJ(I,JX)=SUM
+        XXY(I)=SUM
+      END DO
+      KTT=KTT+LLN(LLM(1))
+      KITTY1=LLN(LLM(1))
+      IJUST=3
+      KT=KT+JCH+JCL+JEH+JEL
+      KITTY2=JCH+JCL+JEH+JEL
+      DEALLOCATE(KKKCUT)
+      DEALLOCATE(LLLCUT)
+      DEALLOCATE(LLV)
+      DEALLOCATE(LLVB)
+      DEALLOCATE(LLE)
+      DEALLOCATE(LLEB)
+      DEALLOCATE(LWRONG)
+      DEALLOCATE(LLL)
+      DEALLOCATE(MVOTE)
+      DEALLOCATE(LLM)
+      DEALLOCATE(LLN)
+      DEALLOCATE(MM)
+      DEALLOCATE(XJCH)
+      DEALLOCATE(XJEH)
+      DEALLOCATE(XJCL)
+      DEALLOCATE(XJEL)
+      DEALLOCATE(ZS)
+      DEALLOCATE(FV1)
+      DEALLOCATE(FV2)
+      DEALLOCATE(SUMX)
+      DEALLOCATE(UUUU)
+      DEALLOCATE(XXX)
+      DEALLOCATE(IWORK)
+      DEALLOCATE(Y16MIDP)
+      DEALLOCATE(YHAT)
+      DEALLOCATE(Z16MIDP)
+      DEALLOCATE(VVV)
+      DEALLOCATE(WORK)
+      DEALLOCATE(X16MIDP)
+      RETURN
+      END
+!
+!  **************************************************************************
+!    SUBROUTINE JAN1PT -- FINDS OPTIMAL CUTTING POINT FOR ONE DIMENSION
+!  **************************************************************************
+!
+      SUBROUTINE JAN1PT(NUMMEMBERS,NUMVOTES,&
+                        NPZZ,NV,NP,NRCALL,NS,NDUAL,IVOT,XMAT,YSS,KA,WS, &
+                        LLV,LLVB,LLE,LLEB, &
+                        LERROR,ZS,JCH,JEH,JCL,JEL,IROTC,KCCUT,LCCUT, &
+                        LLL,XJCH,XJEH,XJCL,XJEL)
+      IMPLICIT DOUBLE PRECISION(A-H,O-Z)
+      INTEGER:: LD=0,LC=0,LA=0,LB=0
+      DOUBLE PRECISION:: AB=0.0,AA=0.0
+      DIMENSION YSS(NDUAL),KA(NDUAL),WS(NDUAL),LV(NDUAL), &
+                LEB(NDUAL),Z(NDUAL),Y(NDUAL),LLV(NDUAL), &
+                LLVB(NDUAL),LE(NDUAL),LERROR(NUMMEMBERS,NUMVOTES), &
+                LLEB(NDUAL),ZS(NDUAL),LLL(NDUAL),XMAT(NUMMEMBERS,25), &
+                XJCH(25),XJEH(25),XJCL(25),XJEL(25),AAJEP(101), &
+                ABJEP(101),LAJEP(101),LBJEP(101),LCJEP(101), &
+                LDJEP(101),ABABJEP(101),MJEP(101), &
+                LVB(NDUAL),LLE(NDUAL),LJEP(NDUAL)
+!
+      JROTC=1
+      KPDUDE=NP
+      KPDUDE2=NRCALL
+      IF(IROTC.EQ.2)THEN
+         JROTC=0
+         IROTC=1
+      ENDIF
+      NPN=NPZZ+1
+      NPP=NPZZ-1
+      KCUT=1
+      LCUT=6
+      NOTE=2
+      IF(IROTC.EQ.1)THEN
+         NOTE=1
+      ENDIF
+      AA1=0.0
+      AB1=0.0
+      LA1=0
+      LB1=0
+      LC1=0
+      LD1=0
+      AA2=999.0
+      AB2=0.0
+      LA2=0
+      LB2=0
+      LC2=0
+      LD2=0
+      DO III=1,NOTE
+        IF(III.EQ.2)THEN
+           KCUT=6
+           LCUT=1
+        ENDIF
+!
+!  CHECK ALL POSSIBLE INTERIOR CUT POINTS  --  THE NP INPUT POINTS
+!      ARE HELD FIXED.  THERE ARE NP POSSIBLE CUT-POINTS BEGINNING
+!      WITH CUT-POINT 1 WHICH IS .001 UNITS TO THE LEFT OF POINT 1.
+!      CUT-POINT 2 IS BETWEEN POINTS 1 AND 2, ETC.
+!
+!     1   2   3   4   5   6   7   8   9   10   11 ...... NP-1   NP
+!    *  *   *   *   *   *   *   *   *   *    *                *
+!    1  2   3   4   5   6   7   8   9  10   11  ...........  NP
+!
+!  IF KCUT=1 AND LCUT=6, THE FOLLOWING NP PATTERNS ARE TESTED
+!
+! PATTERN
+!   1         6666666666666666666666
+!   2         1666666666666666666666
+!   3         1166666666666666666666
+!   4         1116666666666666666666
+!   5         1111666666666666666666
+!   6         1111166666666666666666
+!   7         1111116666666666666666
+!   .           .....
+!   .           .....
+!   .           .....
+!  NP-1       1111111111111111111166
+!   NP        1111111111111111111116
+!
+!  BECAUSE THE PROGRAM TRIES BOTH KCUT=1/LCUT=6 AND KCUT=6/LCUT=1, THIS
+!  WILL ALSO TEST THE ONE MISSING PATTERN ABOVE, VIZ., ALL "1"S.
+!
+!
+        KSE=0
+        KSV=0
+        LSV=0
+        LSE=0
+        KMARK=1
+        I=0
+ 10     I=I+1
+!      IF(I-NPZZ-1)61,12,12
+        IF((I-NPZZ-1).GE.0)GO TO 12
+!  61  Z(I)=999.0
+        Z(I)=999.0
+        IF(I.EQ.1)THEN
+           Y(I)=YSS(1)-.001
+        ENDIF
+        IF(I.GT.1)THEN
+           Y(I)=(YSS(I)+YSS(I-1))/2.0
+        ENDIF
+!      IF(KA(I).EQ.9)GO TO 10
+        IF(KMARK.EQ.1)THEN
+           DO J=I,NPZZ
+             IF(KA(J).EQ.9)GO TO 3
+             IF((LCUT-KA(J)).EQ.0)GO TO 5
+             IF((KCUT-KA(J)).EQ.0)GO TO 6
+             IF((KCUT-KA(J)).NE.0)GO TO 3
+ 5           LSV=LSV+1
+             GO TO 3
+ 6           LSE=LSE+1
+ 3           CONTINUE
+           END DO
+           KMARK=0
+           GO TO 31
+        ENDIF
+        IF(KA(I-1).EQ.KCUT)THEN
+           KSV=KSV+1
+           LSE=LSE-1
+        ENDIF
+        IF(KA(I-1).EQ.LCUT)THEN
+           KSE=KSE+1
+           LSV=LSV-1
+        ENDIF
+!
+ 31     CONTINUE
+        LJEP(I)=I
+        LV(I)=KSV
+        LVB(I)=LSV
+        LE(I)=KSE
+        LEB(I)=LSE
+        KT=LV(I)+LE(I)+LVB(I)+LEB(I)
+        Z(I)=FLOAT(LE(I)+LEB(I))/FLOAT(KT)
+!
+        IF(JROTC.EQ.0)THEN
+           ZS(I)=Y(I)
+           LLV(I)=LV(I)
+           LLE(I)=LE(I)
+           LLVB(I)=LVB(I)
+           LLEB(I)=LEB(I)
+        ENDIF
+        GO TO 10
+ 12     CONTINUE
+!
+!  FIND BEST CUT POINT
+!
+        CALL KPRSORT(Z,NPZZ,LJEP)
+        KIN=1
+        MJEP(1)=1
+        AAJEP(KIN)=Z(1)
+        ABJEP(KIN)=Y(LJEP(1))
+        ABABJEP(KIN)=ABS(ABJEP(KIN))
+        LAJEP(KIN)=LV(LJEP(1))
+        LBJEP(KIN)=LE(LJEP(1))
+        LCJEP(KIN)=LVB(LJEP(1))
+        LDJEP(KIN)=LEB(LJEP(1))
+!
+!  CHECK IF THERE ARE MULTIPLE CUT-POINTS WITH SAME CLASSIFICATION AND
+!    SELECT THAT CUT-POINT CLOSEST TO THE INTERIOR OF THE SPACE
+!
+        DO I=2,NPZZ
+          IF(ABS(Z(1)-Z(I)).LE..00001)THEN
+             KIN=KIN+1
+             MJEP(KIN)=KIN
+             AAJEP(KIN)=Z(I)
+             ABJEP(KIN)=Y(LJEP(I))
+             ABABJEP(KIN)=ABS(ABJEP(KIN))
+             LAJEP(KIN)=LV(LJEP(I))
+             LBJEP(KIN)=LE(LJEP(I))
+             LCJEP(KIN)=LVB(LJEP(I))
+             LDJEP(KIN)=LEB(LJEP(I))
+             IF(KIN.GT.100)GO TO 633
+             GO TO 63
+          ENDIF
+          IF(Z(1).LT.Z(I))GO TO 633
+ 63       CONTINUE
+        END DO
+ 633    CONTINUE
+        IF(KIN.EQ.1)THEN
+           AA=AAJEP(1)
+           AB=ABJEP(1)
+           LA=LAJEP(1)
+           LB=LBJEP(1)
+           LC=LCJEP(1)
+           LD=LDJEP(1)
+        ENDIF
+        IF(KIN.GT.1)THEN
+           CALL KPRSORT(ABABJEP,KIN,MJEP)
+           AA=AAJEP(MJEP(1))
+           AB=ABJEP(MJEP(1))
+           LA=LAJEP(MJEP(1))
+           LB=LBJEP(MJEP(1))
+           LC=LCJEP(MJEP(1))
+           LD=LDJEP(MJEP(1))
+        ENDIF
+!
+        IF(III.EQ.1)THEN
+           AA1=AA
+           AB1=AB
+           LA1=LA
+           LB1=LB
+           LC1=LC
+           LD1=LD
+        ENDIF
+        IF(III.EQ.2)THEN
+           AA2=AA
+           AB2=AB
+           LA2=LA
+           LB2=LB
+           LC2=LC
+           LD2=LD
+        ENDIF
+!
+      END DO
+!
+      IF(AA1.LE.AA2)THEN
+         KCCUT=1
+         LCCUT=6
+         AA=AA1
+         AB=AB1
+         LA=LA1
+         LB=LB1
+         LC=LC1
+         LD=LD1
+      ENDIF
+      IF(AA1.GT.AA2)THEN
+         KCCUT=6
+         LCCUT=1
+         AA=AA2
+         AB=AB2
+         LA=LA2
+         LB=LB2
+         LC=LC2
+         LD=LD2
+      ENDIF
+      IF(IROTC.EQ.1)THEN
+         KCCUT=1
+         LCCUT=6
+         AA=AA1
+         AB=AB1
+         LA=LA1
+         LB=LB1
+         LC=LC1
+         LD=LD1
+      ENDIF
+      WS(IVOT)=AB
+      IF(IROTC.EQ.1)WS(IVOT+NV)=AB
+      IF(JROTC.EQ.1)THEN
+         ZS(IVOT)=AA
+         LLV(IVOT)=LA
+         LLE(IVOT)=LB
+         LLVB(IVOT)=LC
+         LLEB(IVOT)=LD
+      ENDIF
+      JCL=LA
+      JEL=LB
+      JCH=LC
+      JEH=LD
+!
+      IF(IROTC.EQ.0)THEN
+         DO K=1,NS
+           XJCH(K)=0.0
+           XJEH(K)=0.0
+           XJCL(K)=0.0
+           XJEL(K)=0.0
+         END DO
+         DO I=1,NPZZ
+           IF(LLL(I).LE.NPZZ-1)LERROR(LLL(I),IVOT)=0
+           IF(KA(I).EQ.9)GO TO 64
+           LERROR(LLL(I),IVOT)=0
+           IF(YSS(I).LT.AB)THEN
+              IF(KA(I).EQ.KCCUT)THEN
+                 LERROR(LLL(I),IVOT)=0
+                 DO K=1,NS
+                   XJCL(K)=XJCL(K)+XMAT(LLL(I),K)
+                 END DO
+              ENDIF
+              IF(KA(I).EQ.LCCUT)THEN
+                 LERROR(LLL(I),IVOT)=1
+                 DO K=1,NS
+                   XJEL(K)=XJEL(K)+XMAT(LLL(I),K)
+                 END DO
+              ENDIF
+           ENDIF
+           IF(YSS(I).GT.AB)THEN
+              IF(KA(I).EQ.LCCUT)THEN
+                 LERROR(LLL(I),IVOT)=0
+                 DO K=1,NS
+                   XJCH(K)=XJCH(K)+XMAT(LLL(I),K)
+                 END DO
+              ENDIF
+              IF(KA(I).EQ.KCCUT)THEN
+                 LERROR(LLL(I),IVOT)=1
+                 DO K=1,NS
+                   XJEH(K)=XJEH(K)+XMAT(LLL(I),K)
+                 END DO
+              ENDIF
+           ENDIF
+ 64        CONTINUE
+         END DO
+         DO K=1,NS
+           IF(JCL.GT.0)XJCL(K)=XJCL(K)/FLOAT(JCL)
+           IF(JEL.GT.0)XJEL(K)=XJEL(K)/FLOAT(JEL)
+           IF(JCH.GT.0)XJCH(K)=XJCH(K)/FLOAT(JCH)
+           IF(JEH.GT.0)XJEH(K)=XJEH(K)/FLOAT(JEH)
+         END DO
+      ENDIF
+      IF(IROTC.EQ.1)THEN
+         DO I=1,NPZZ
+           IF(LLL(I).LE.NPZZ-1)LERROR(IVOT,LLL(I))=0
+           IF(KA(I).EQ.9)GO TO 65
+           LERROR(IVOT,LLL(I))=0
+           IF(YSS(I).LT.AB)THEN
+              IF(KA(I).EQ.KCCUT)LERROR(IVOT,LLL(I))=0
+              IF(KA(I).EQ.LCCUT)LERROR(IVOT,LLL(I))=1
+           ENDIF
+           IF(YSS(I).GT.AB)THEN
+              IF(KA(I).EQ.LCCUT)LERROR(IVOT,LLL(I))=0
+              IF(KA(I).EQ.KCCUT)LERROR(IVOT,LLL(I))=1
+           ENDIF
+ 65        CONTINUE
+         END DO
+      ENDIF
+      RETURN
+      END
+!
+!
+! *********************************************************************
+!   SUBROUTINE KPLEGIS -- PERFORMS THE LEGISLATIVE PROCEDURE
+!                           30 JUNE 1999
+!
+! *********************************************************************
+!
+      SUBROUTINE KPLEGIS(NUMMEMBERS,NUMVOTES,&
+                         JJJ,NP,NRCALL,NS,NDUAL,XMAT,LLEGERR, &
+                        ZVEC,WS,MCUTS,LERROR,LTOTAL,MWRONG, &
+                        LDATA,IPRINT)
+      IMPLICIT DOUBLE PRECISION(A-H,O-Z)
+      DIMENSION XMAT(NUMMEMBERS,25),ZVEC(NUMVOTES,25),&
+              MCUTS(NUMVOTES,2),WS(NDUAL),LERROR(NUMMEMBERS,NUMVOTES),&
+              LLEGERR(NUMMEMBERS,2),LDATA(NUMMEMBERS,NUMVOTES)
+!
+      DOUBLE PRECISION, ALLOCATABLE :: BB(:,:)
+      ALLOCATE(BB(25,NRCALL))
+!
+!  885 FORMAT(' ERROR CHECK ON ENTRY TO KPLEGIS',I5,I7)
+! 1094 FORMAT(' LEG CLASSIFICATION ERROR  ',2I3,2I8,2F10.5)
+!
+      IF(JJJ.EQ.1) JJJ=1  !hack to get rid of warnings
+      CALL ECHOEVENT(1)
+      CALL FLUSHCON()
+      CALL PROCEVENT()
+      CALL ZVECINV(NUMMEMBERS,NUMVOTES,NRCALL,NS,ZVEC,BB,IPRINT)
+!
+      LTOTAL=0
+      LWRONG=0
+      MWRONG=0
+      DO I=1,NP
+        KCHECK4=0
+        DO JX=1,NRCALL
+          KCHECK4=KCHECK4+LERROR(I,JX)
+        END DO
+        XSAVE1=XMAT(I,1)
+        XSAVE2=XMAT(I,2)
+        IVOT=I
+        CALL KTPXI(NUMMEMBERS,NUMVOTES,&
+                   IVOT,NP,NRCALL,NS,NDUAL,MCUTS,BB,XMAT,ZVEC,WS, &
+                    LERROR,KTOTAL,KWRONG,LDATA)
+!
+!      WRITE(21,1492)I,KCHECK4,KWRONG,KTOTAL,XSAVE1,XSAVE2,
+!     C                    XMAT(I,1),XMAT(I,2)
+! 1492 FORMAT(4I8,4F7.3)
+        MWRONG=MWRONG+KWRONG
+        LTOTAL=LTOTAL+KTOTAL
+        LLEGERR(I,1)=KWRONG
+        LLEGERR(I,2)=KTOTAL
+!
+      END DO
+      IF(LTOTAL.GT.0)THEN
+        XERROR=FLOAT(MWRONG)/FLOAT(LTOTAL)
+        YERROR=1.0-XERROR
+      ENDIF
+!      IF(IPRINT.EQ.1)WRITE(23,1094)JJJ,NS,MWRONG,LTOTAL,XERROR,YERROR
+      DEALLOCATE(BB)
+      RETURN
+      END
+!
+! **************************************************************************
+!  SUBROUTINE ZVECINV -- CALCULATES (Z'Z)-1Z' WHERE Z IS THE NORMAL PLANE
+!                        MATRIX
+! **************************************************************************
+!
+      SUBROUTINE ZVECINV(NUMMEMBERS,NUMVOTES,NRCALL,NS,ZVEC,BB,IPRINT)
+      IMPLICIT DOUBLE PRECISION(A-H,O-Z)
+      DIMENSION BB(25,NRCALL),ZVEC(NUMVOTES,25)
+      INTEGER, ALLOCATABLE :: IWORK(:)
+      DOUBLE PRECISION, ALLOCATABLE :: VVV(:,:)
+      DOUBLE PRECISION, ALLOCATABLE :: VVV2(:,:)
+      DOUBLE PRECISION, ALLOCATABLE :: FV1(:)
+      DOUBLE PRECISION, ALLOCATABLE :: FV2(:)
+      DOUBLE PRECISION, ALLOCATABLE :: WORK(:)
+      DOUBLE PRECISION, ALLOCATABLE :: VCOV(:,:)
+      DOUBLE PRECISION, ALLOCATABLE :: VCOV2(:,:)
+      DOUBLE PRECISION, ALLOCATABLE :: WVEC(:)
+      DOUBLE PRECISION, ALLOCATABLE :: UL(:,:)
+      ALLOCATE(VVV(25,25))
+      ALLOCATE(VVV2(25,25))
+      ALLOCATE(FV1(NRCALL))
+      ALLOCATE(FV2(NRCALL))
+      ALLOCATE(VCOV(25,25))
+      ALLOCATE(VCOV2(25,25))
+      ALLOCATE(WVEC(25))
+      ALLOCATE(UL(25,25))
+      ALLOCATE(IWORK(8*25*25+1875))
+      ALLOCATE(WORK(8*25*25+1875))
+!
+      LWORK=8*25*25+1875
+      KPDUDE=NUMMEMBERS
+!
+! 1011 FORMAT(7F10.4)
+! 1012 FORMAT(' DECOMPOSITION OF NORMAL VECTOR MATRIX',3I4)
+! 1091 FORMAT(' INVERSE MATRIX ERROR',F10.4)
+!
+!
+!    (X'X)
+!
+      IF(IPRINT.EQ.1) IPRINT=1  !hack to get rid of warnings
+      DO K=1,NS
+        DO L=1,NS
+          SUM=0.0
+          DO I=1,NRCALL
+            SUM=SUM+ZVEC(I,K)*ZVEC(I,L)
+          END DO
+          VCOV(K,L)=SUM
+          VCOV2(K,L)=SUM
+        END DO
+      END DO
+!
+!  EIGENVECTOR-EIGENVALUE DECOMPOSITION OF NORMAL VECTOR MATRIX
+!
+!
+      CALL DGESDD('S',NS,NS,VCOV2,25,WVEC,VVV, &
+                 25,VVV2,25,WORK,LWORK,IWORK,IRANK)
+!
+!      CALL KPRS(25,NS,VCOV,WVEC,1,VVV,FV1,FV2,IER)
+!
+!  (X'X)-1
+!
+      DO I=1,NS
+        DO K=1,NS
+          SUM=0.0
+          DO J=1,NS
+!      IF(ABS(WVEC(NS+1-J)).GT..0001)THEN
+!          SUM=SUM+VVV(K,NS+1-J)*(1.0/WVEC(NS+1-J))*VVV(I,NS+1-J)
+            IF(ABS(WVEC(J)).GT..0001)THEN
+                SUM=SUM+VVV(K,J)*(1.0/WVEC(J))*VVV(I,J)
+            ENDIF
+          END DO
+          UL(I,K)=SUM
+        END DO
+        UL(I,K)=SUM
+      END DO
+!
+!
+!  MATRIX INVERSION CHECK  (X'X)-1(X'X) = I
+!
+      ASUM=0.0
+      DO I=1,NS
+        DO J=1,NS
+          SUM=0.0
+          DO K=1,NS
+            SUM=SUM+UL(J,K)*VCOV(K,I)
+          END DO
+          IF(I.EQ.J)ASUM=ASUM+ABS(1.0-SUM)
+          IF(I.NE.J)ASUM=ASUM+ABS(SUM)
+        END DO
+      END DO
+!      IF(ASUM.GT..01.AND.IPRINT.EQ.1)WRITE(23,1091)ASUM
+!
+!  (X'X)-1*X'
+!
+      SUM=0.0
+      DO I=1,NRCALL
+        DO J=1,NS
+          DO JJ=1,NS
+            SUM=SUM+UL(J,JJ)*ZVEC(I,JJ)
+          END DO
+          BB(J,I)=SUM
+        END DO
+        BB(J,I)=SUM
+      END DO
+!
+      DEALLOCATE(VVV)
+      DEALLOCATE(VVV2)
+      DEALLOCATE(FV1)
+      DEALLOCATE(FV2)
+      DEALLOCATE(VCOV)
+      DEALLOCATE(VCOV2)
+      DEALLOCATE(WVEC)
+      DEALLOCATE(UL)
+      DEALLOCATE(WORK)
+      DEALLOCATE(IWORK)
+      RETURN
+      END
+!
+! **************************************************************************
+!  SUBROUTINE KTPXI -- PERFORMS LEGISLATOR FITTING
+! **************************************************************************
+!
+      SUBROUTINE KTPXI(NUMMEMBERS,NUMVOTES,&
+                       ILEG,NP,NRCALL,NS,NDUAL,MCUTS,BB,XMAT,ZVEC,WS, &
+                              LERROR,KTOTAL,KWRONG,LDATA)
+      IMPLICIT DOUBLE PRECISION(A-H,O-Z)
+      DIMENSION BB(25,NRCALL),XMAT(NUMMEMBERS,25),WS(NDUAL),&
+                LERROR(NUMMEMBERS,NUMVOTES), &
+                ZVEC(NUMVOTES,25),MCUTS(NUMVOTES,2),&
+                LDATA(NUMMEMBERS,NUMVOTES)
+!
+      INTEGER, ALLOCATABLE :: LL(:)
+      INTEGER, ALLOCATABLE :: LSAVE(:,:)
+      DOUBLE PRECISION, ALLOCATABLE :: ZWRONG(:)
+      DOUBLE PRECISION, ALLOCATABLE :: XDAT(:,:)
+      DOUBLE PRECISION, ALLOCATABLE :: XXZ(:)
+      DOUBLE PRECISION, ALLOCATABLE :: YWRONG(:,:)
+      DOUBLE PRECISION, ALLOCATABLE :: YYWRONG(:,:)
+      DOUBLE PRECISION, ALLOCATABLE :: XMAT2(:)
+      DOUBLE PRECISION, ALLOCATABLE :: XXY(:)
+      DOUBLE PRECISION, ALLOCATABLE :: YYYWRONG(:,:)
+      ALLOCATE(LL(NRCALL))
+      ALLOCATE(LSAVE(NRCALL,25))
+      ALLOCATE(ZWRONG(50))
+      ALLOCATE(XDAT(NP,25))
+      ALLOCATE(XXZ(NRCALL))
+      ALLOCATE(YWRONG(NRCALL,25))
+      ALLOCATE(YYWRONG(NRCALL,25))
+      ALLOCATE(XMAT2(25))
+      ALLOCATE(XXY(NRCALL))
+      ALLOCATE(YYYWRONG(NRCALL,25))
+!
+! 1001 FORMAT(I4,2X,I6,I4)
+! 1011 FORMAT(I4,2I3,I4,12F7.3)
+! 1012 FORMAT(14X,12F7.3)
+! 1013 FORMAT(' LEG',2I3,I4,12F7.3)
+! 1014 FORMAT(' WHOA DUDE',I4,I3,I4)
+! 1015 FORMAT(' HEY THESE ARE NOT EQUAL!')
+! 1016 FORMAT(I4,2I3,I4,12F7.3)
+! 1017 FORMAT(14X,I4,12F7.3)
+! 1018 FORMAT(10X,2I4,12F7.3)
+! 1019 FORMAT(16X,12F7.3)
+! 1020 FORMAT(2I4,3F10.4)
+! 1021 FORMAT(4I4,12F7.3)
+! 1022 FORMAT(' TWO  ',3I4,12F7.3)
+! 1023 FORMAT(' THREE',3I4,12F7.3)
+! 1024 FORMAT(' FOUR ',3I4,12F7.3)
+! 1025 FORMAT(4X,4X,12X,12F7.3)
+! 1026 FORMAT(I4,25F7.3)
+!
+      DO I=1,50
+        ZWRONG(I)=0.0
+      END DO
+      NTRIAL2=15
+      MZZZ=5
+!
+!      WRITE(21,1019)(XMAT(ILEG,K),K=1,NS)
+      DO K=1,NS
+        XDAT(20,K)=XMAT(ILEG,K)
+      END DO
+!
+      DO IIII=1,2
+        SUM=0.0
+        DO K=1,NS
+          XDAT(1,K)=0.0
+!      IF(IIII.EQ.2)XDAT(1,K)=0.1
+          IF(IIII.EQ.2)XDAT(1,K)=XDAT(20,K)
+          XDAT(2,K)=XDAT(1,K)
+        END DO
+!
+!      WRITE(21,1019)(XDAT(1,K),K=1,NS)
+        KWRONG=0
+        K3WRONG=0
+!
+        DO III=1,MZZZ
+!
+          DO II=1,NTRIAL2
+            NII=II
+            DO KL=1,NS
+!
+              K3WRONG=KWRONG
+              XDAT(2,KL)=0.01
+!
+!
+!  CALCULATE FEASIBLE ALPHA VALUE
+!
+              ASUM=0.0
+              AAA=0.0
+              BBB=0.0
+              DO ML=1,NS
+                ASUM=ASUM+XDAT(1,ML)**2
+                AAA=AAA+(XDAT(2,ML)-XDAT(1,ML))**2
+                BBB=BBB+2.0*(XDAT(2,ML)-XDAT(1,ML))*XDAT(1,ML)
+              END DO
+              CCC=ASUM - 1.0
+              RAD=BBB*BBB-4.0*AAA*CCC
+              RADSQ=SQRT(ABS(RAD))
+              ROOT1=0.0
+              ROOT2=0.0
+              IF(AAA.GT..00001)THEN
+                 ROOT1=(-BBB+RADSQ)/(2.0*AAA)
+                 ROOT2=(-BBB-RADSQ)/(2.0*AAA)
+              ENDIF
+!
+              CALL KTPXIXJ(NUMMEMBERS,NUMVOTES,&
+                           NII,ILEG,NP,NRCALL,NS,NDUAL,MCUTS,BB,XDAT,ZVEC,WS, &
+                              XXZ,WSSY,XMAT2,ZWRONG,YYWRONG,LERROR,KTOTAL, &
+                              KWRONG,ROOT1,ROOT2,LDATA)
+!
+              LSAVE(II,KL)=KWRONG
+              IF(KWRONG.EQ.0)THEN
+                 LL(1)=II
+                 DO K=1,NS
+                   XMAT(ILEG,K)=XMAT2(K)
+                 END DO
+                 KKNII=NII
+                 K3WRONG=KWRONG
+!         WRITE(21,1021)ILEG,III,II,KWRONG,(XMAT(ILEG,K),K=1,NS)
+                 GO TO 996
+              ENDIF
+!
+              SUM=0.0
+              DO K=1,NS
+                SUM=SUM+XMAT2(K)**2
+                YWRONG(II,K)=XMAT2(K)
+                YYYWRONG(KL,K)=XMAT2(K)
+                XDAT(3,K)=XDAT(1,K)
+                XDAT(1,K)=XMAT2(K)
+                XDAT(2,K)=XMAT2(K)
+                XMAT(ILEG,K)=XMAT2(K)
+              END DO
+!
+!      WRITE(21,1011)ILEG,II,KL,KWRONG,(XDAT(3,K),K=1,NS)
+!      WRITE(21,1012)(XMAT2(K),K=1,NS),(ZWRONG(K),K=1,NS)
+!
+            END DO
+!
+            SUM=0.0
+            KSUM=0
+            DO K=1,NS
+              IF(II.GT.1)THEN
+                 SUM=SUM+(YWRONG(II,K)-YWRONG(II-1,K))**2
+                 KSUM=KSUM+ABS(LSAVE(II,K)-LSAVE(II-1,K))
+              ENDIF
+            END DO
+            IF(II.EQ.1)GO TO 988
+            IF(SUM.LE..000001)GO TO 986
+            IF(II.GT.5.AND.KSUM.EQ.0)GO TO 986
+ 988        CONTINUE
+          END DO
+!
+ 986      CONTINUE
+!      WRITE(21,1021)ILEG,III,II,KWRONG,(XMAT(ILEG,K),K=1,NS)
+          KKKNII=NII
+          K3WRONG=KWRONG
+!
+!
+!  CALCULATE FEASIBLE ALPHA VALUE
+!
+          ASUM=0.0
+          AAA=0.0
+          BBB=0.0
+          DO ML=1,NS
+            XDAT(1,ML)=XMAT(ILEG,ML)
+            XDAT(2,ML)=ZWRONG(K)
+            ASUM=ASUM+XDAT(1,ML)**2
+            AAA=AAA+(XDAT(2,ML)-XDAT(1,ML))**2
+            BBB=BBB+2.0*(XDAT(2,ML)-XDAT(1,ML))*XDAT(1,ML)
+          END DO
+          CCC=ASUM - 1.0
+          RAD=BBB*BBB-4.0*AAA*CCC
+          RADSQ=SQRT(ABS(RAD))
+          ROOT1=0.0
+          ROOT2=0.0
+          IF(AAA.GT..00001)THEN
+             ROOT1=(-BBB+RADSQ)/(2.0*AAA)
+             ROOT2=(-BBB-RADSQ)/(2.0*AAA)
+          ENDIF
+!      ROOT1=(-BBB+RADSQ)/(2.0*AAA)
+!      ROOT2=(-BBB-RADSQ)/(2.0*AAA)
+!
+          CALL KTPXIXJ(NUMMEMBERS,NUMVOTES,&
+                       NII,ILEG,NP,NRCALL,NS,NDUAL,MCUTS,BB,XDAT,ZVEC,WS, &
+                          XXZ,WSSY,XMAT2,ZWRONG,YYWRONG,LERROR,KTOTAL, &
+                          KWRONG,ROOT1,ROOT2,LDATA)
+!
+!      WRITE(21,1021)ILEG,III,II,KWRONG,(XMAT2(K),K=1,NS),WSSY
+!
+          DO K=1,NS
+            XMAT(ILEG,K)=XMAT2(K)
+            XDAT(1,K)=XMAT2(K)
+            XDAT(2,K)=XMAT2(K)
+            IF(IIII.EQ.1)XDAT(10,K)=XMAT2(K)
+          END DO
+          IF(KWRONG.EQ.0)GO TO 996
+        END DO
+        IF(IIII.EQ.1)KLWRONG=KWRONG
+        IF(IIII.EQ.2)THEN
+!
+!  CALCULATE FEASIBLE ALPHA VALUE
+!
+           ASUM=0.0
+           AAA=0.0
+           BBB=0.0
+           DO ML=1,NS
+             XDAT(1,ML)=XMAT(ILEG,ML)
+             XDAT(2,ML)=XDAT(10,ML)
+             ASUM=ASUM+XDAT(1,ML)**2
+             AAA=AAA+(XDAT(2,ML)-XDAT(1,ML))**2
+             BBB=BBB+2.0*(XDAT(2,ML)-XDAT(1,ML))*XDAT(1,ML)
+           END DO
+           CCC=ASUM - 1.0
+           RAD=BBB*BBB-4.0*AAA*CCC
+           RADSQ=SQRT(ABS(RAD))
+           ROOT1=0.0
+           ROOT2=0.0
+           IF(AAA.GT..00001)THEN
+              ROOT1=(-BBB+RADSQ)/(2.0*AAA)
+              ROOT2=(-BBB-RADSQ)/(2.0*AAA)
+           ENDIF
+!         ROOT1=(-BBB+RADSQ)/(2.0*AAA)
+!         ROOT2=(-BBB-RADSQ)/(2.0*AAA)
+!
+           CALL KTPXIXJ(NUMMEMBERS,NUMVOTES,&
+                        NII,ILEG,NP,NRCALL,NS,NDUAL,MCUTS,BB,XDAT,ZVEC, &
+                        WS,XXZ,WSSY,XMAT2,ZWRONG,YYWRONG,LERROR,KTOTAL, &
+                        KWRONG,ROOT1,ROOT2,LDATA)
+!
+!         WRITE(21,1021)ILEG,III,II,KWRONG,(XMAT2(K),K=1,NS),WSSY
+!
+           DO K=1,NS
+             XMAT(ILEG,K)=XMAT2(K)
+           END DO
+           IF(KWRONG.EQ.0)GO TO 996
+        ENDIF
+!
+      END DO
+!
+ 996  CONTINUE
+!
+      SUM=0.0
+      DO K=1,NS
+        SUM=SUM+XMAT(ILEG,K)**2
+      END DO
+      IF(SUM.GT.1.0)THEN
+         DO K=1,NS
+           XMAT(ILEG,K)=XMAT(ILEG,K)/SQRT(SUM)
+         END DO
+      ENDIF
+!
+      KKRITE=0
+      KKWRONG=0
+      KTOTAL=0
+      DO JX=1,NRCALL
+        LERROR(ILEG,JX)=0
+        SUM=0.0
+        DO K=1,NS
+          SUM=SUM+XMAT(ILEG,K)*ZVEC(JX,K)
+        END DO
+        XXY(JX)=SUM
+        DB2B1=WS(JX)-XXY(JX)
+!
+!  CALCULATE CLASSIFICATION ERROR
+!
+        IF(LDATA(ILEG,JX).NE.0)THEN
+           KTOTAL=KTOTAL+1
+           IF(XXY(JX).LT.WS(JX))THEN
+!            KTOTAL=KTOTAL+1
+              IF(LDATA(ILEG,JX).EQ.MCUTS(JX,1))THEN
+                 KKRITE=KKRITE+1
+              ENDIF
+              IF(LDATA(ILEG,JX).EQ.MCUTS(JX,2))THEN
+                 LERROR(ILEG,JX)=1
+                 KKWRONG=KKWRONG+1
+              ENDIF
+           ENDIF
+           IF(XXY(JX).GT.WS(JX))THEN
+!            KTOTAL=KTOTAL+1
+              IF(LDATA(ILEG,JX).EQ.MCUTS(JX,2))THEN
+                 KKRITE=KKRITE+1
+              ENDIF
+              IF(LDATA(ILEG,JX).EQ.MCUTS(JX,1))THEN
+                 LERROR(ILEG,JX)=1
+                 KKWRONG=KKWRONG+1
+              ENDIF
+           ENDIF
+        ENDIF
+      END DO
+!      WRITE(21,1001)ILEG,KKRITE,KKWRONG
+!      IF(KKWRONG.NE.KWRONG)THEN
+!         WRITE(21,1015)
+!      ENDIF
+      SUM=0.0
+      DO K=1,NS
+        SUM=SUM+(XDAT(20,K)-XMAT(ILEG,K))**2
+      END DO
+      SUM=SQRT(SUM)
+!      WRITE(23,1026)ILEG,SUM
+      DEALLOCATE(LL)
+      DEALLOCATE(LSAVE)
+      DEALLOCATE(ZWRONG)
+      DEALLOCATE(XDAT)
+      DEALLOCATE(XXZ)
+      DEALLOCATE(YWRONG)
+      DEALLOCATE(YYWRONG)
+      DEALLOCATE(XMAT2)
+      DEALLOCATE(XXY)
+      DEALLOCATE(YYYWRONG)
+      RETURN
+      END
+!
+! **************************************************************************
+!  SUBROUTINE KTPXIXJ -- PERFORMS LEGISLATOR FITTING
+! **************************************************************************
+!
+      SUBROUTINE KTPXIXJ(NUMMEMBERS,NUMVOTES,&
+                         NII,ILEG,NP,NRCALL,NS,NDUAL,MCUTS,BB,XDAT,ZVEC, &
+                         WS,XXZ,WSSY,XMAT2,ZWRONG,YWRONG,LERROR,KTOTAL, &
+                            KKWRONG,ROOT1,ROOT2,LDATA)
+      IMPLICIT DOUBLE PRECISION(A-H,O-Z)
+      DIMENSION BB(25,NRCALL),XDAT(NP,25),WS(NDUAL),&
+                LERROR(NUMMEMBERS,NUMVOTES), &
+                ZVEC(NUMVOTES,25),MCUTS(NUMVOTES,2),XXZ(NRCALL), &
+                ZWRONG(50),YWRONG(NRCALL,25),XMAT2(25),&
+                LDATA(NUMMEMBERS,NUMVOTES)
+!
+      INTEGER, ALLOCATABLE :: MRITE(:,:)
+      INTEGER, ALLOCATABLE :: KALL(:)
+      INTEGER, ALLOCATABLE :: LALL(:)
+      DOUBLE PRECISION, ALLOCATABLE :: YALL(:)
+      DOUBLE PRECISION, ALLOCATABLE :: XALL(:)
+      DOUBLE PRECISION, ALLOCATABLE :: XXY(:)
+      DOUBLE PRECISION, ALLOCATABLE :: XSAVE(:,:)
+      ALLOCATE(MRITE(NRCALL,100))
+      ALLOCATE(LALL(NDUAL))
+      ALLOCATE(YALL(NDUAL))
+      ALLOCATE(XALL(NDUAL))
+      ALLOCATE(KALL(NDUAL))
+      ALLOCATE(XXY(NRCALL))
+      ALLOCATE(XSAVE(NRCALL,100))
+!
+! 1012 FORMAT(I4,3I6,7F7.3)
+! 1013 FORMAT(2I4,3I6,F12.6,6F7.3/8X,8F7.3/8X,8F7.3)
+! 1013 FORMAT(2I4,4I6,3F7.3)
+! 1014 FORMAT(15X,I6,13X,4F7.3)
+! 1015 FORMAT(I5,4F7.3)
+! 1016 FORMAT(I5,2F7.3,I3,F7.3)
+! 1017 FORMAT(I5,2F10.4,3F7.3)
+! 1018 FORMAT(4X,6I5,20F10.4)
+! 1019 FORMAT(2I4,4I6)
+! 1020 FORMAT(' INITIAL ERROR',I4,3I6,7F7.3)
+! 1021 FORMAT(I3,2I5,15F7.3)
+! 1023 FORMAT(3I4,F15.10)
+!
+      KWED1=NII
+!
+!  INITIALIZE AT ZERO
+!
+      NTRY=2
+!
+      DO III=1,NTRY
+        KTOTAL=0
+        KRITE=0
+        KWRONG=0
+        DO JX=1,NRCALL
+          SUM=0.0
+          DO K=1,NS
+            SUM=SUM+XDAT(III,K)*ZVEC(JX,K)
+          END DO
+          XXY(JX)=SUM
+          XSAVE(JX,III)=SUM
+          MRITE(JX,III)=0
+          DB2B1=WS(JX)-XXY(JX)
+          IF(LDATA(ILEG,JX).NE.0)THEN
+             KTOTAL=KTOTAL+1
+!
+!  CALCULATE CLASSIFICATION ERROR
+!
+             IF(XXY(JX).LT.WS(JX))THEN
+                IF(LDATA(ILEG,JX).EQ.MCUTS(JX,1))THEN
+                   KRITE=KRITE+1
+                   MRITE(JX,III)=1
+                ENDIF
+                IF(LDATA(ILEG,JX).EQ.MCUTS(JX,2))THEN
+                   KWRONG=KWRONG+1
+                ENDIF
+             ENDIF
+             IF(XXY(JX).GT.WS(JX))THEN
+                IF(LDATA(ILEG,JX).EQ.MCUTS(JX,1))THEN
+                   KWRONG=KWRONG+1
+                ENDIF
+                IF(LDATA(ILEG,JX).EQ.MCUTS(JX,2))THEN
+                   KRITE=KRITE+1
+                   MRITE(JX,III)=1
+                ENDIF
+             ENDIF
+          ENDIF
+        END DO
+!      WRITE(21,1012)III,KRITE,KWRONG,KTOTAL,(XDAT(III,K),K=1,NS)
+      END DO
+!
+!
+!  CONSTRUCT PROJECTION VECTOR
+!
+      JJJ=1
+      III=2
+      ITOT=0
+      KRITE=0
+      KWRONG=0
+      KTOTAL=0
+      XERR=0.0
+      XKMAX=+99999.0
+      XKMIN=-99999.0
+      DO JX=1,NRCALL
+!
+        DB2B1=WS(JX)-XSAVE(JX,III)
+        DENOM=XSAVE(JX,III)-XSAVE(JX,JJJ)
+        IF(ABS(DENOM).LE.0.00001)THEN
+!         WRITE(23,1023)NII,ILEG,JX,DENOM
+           GO TO 1
+        ENDIF
+        XNUM1=+1.0-XSAVE(JX,JJJ)
+        XNUM2=-1.0-XSAVE(JX,JJJ)
+        XNUM3=WS(JX)-XSAVE(JX,JJJ)
+!
+!  CALCULATE CLASSIFICATION ERROR
+!
+        IF(LDATA(ILEG,JX).NE.0)THEN
+           IF(XSAVE(JX,III).LT.WS(JX))THEN
+              KTOTAL=KTOTAL+1
+              IF(LDATA(ILEG,JX).EQ.MCUTS(JX,1))THEN
+                 KRITE=KRITE+1
+!
+!  CORRECT TO CORRECT (CASES 3 AND 4)
+!
+                 IF(MRITE(JX,JJJ).EQ.1)THEN
+!  CASE 3
+                    IF(XSAVE(JX,III).LT.XSAVE(JX,JJJ))THEN
+                       ITOT=ITOT+1
+                       XALL(ITOT)=XNUM2/DENOM
+                       KALL(ITOT)=6
+                       ITOT=ITOT+1
+                       XALL(ITOT)=XNUM3/DENOM
+                       KALL(ITOT)=1
+                    ENDIF
+!  CASE 4
+                    IF(XSAVE(JX,III).GT.XSAVE(JX,JJJ))THEN
+                       ITOT=ITOT+1
+                       XALL(ITOT)=XNUM3/DENOM
+                       KALL(ITOT)=6
+                       ITOT=ITOT+1
+                       XALL(ITOT)=XNUM2/DENOM
+                       KALL(ITOT)=1
+                    ENDIF
+                 ENDIF
+!
+!  INCORRECT TO CORRECT (CASE 11)
+!
+                 IF(MRITE(JX,JJJ).EQ.0)THEN
+                    ITOT=ITOT+1
+                    XALL(ITOT)=XNUM2/DENOM
+                    KALL(ITOT)=6
+                    ITOT=ITOT+1
+                    XALL(ITOT)=XNUM3/DENOM
+                    KALL(ITOT)=1
+                 ENDIF
+              ENDIF
+              IF(LDATA(ILEG,JX).EQ.MCUTS(JX,2))THEN
+                 KWRONG=KWRONG+1
+!
+!  CORRECT TO INCORRECT (CASE 9)
+!
+                 IF(MRITE(JX,JJJ).EQ.1)THEN
+                    ITOT=ITOT+1
+                    XALL(ITOT)=XNUM3/DENOM
+                    KALL(ITOT)=6
+                    ITOT=ITOT+1
+                    XALL(ITOT)=XNUM1/DENOM
+                    KALL(ITOT)=1
+                 ENDIF
+!
+!  INCORRECT TO INCORRECT (CASES 7 AND 8)
+!
+                 IF(MRITE(JX,JJJ).EQ.0)THEN
+!  CASE 7
+                    IF(XSAVE(JX,III).LT.XSAVE(JX,JJJ))THEN
+                       ITOT=ITOT+1
+                       XALL(ITOT)=XNUM3/DENOM
+                       KALL(ITOT)=6
+                       ITOT=ITOT+1
+                       XALL(ITOT)=XNUM1/DENOM
+                       KALL(ITOT)=1
+                    ENDIF
+!  CASE 8
+                    IF(XSAVE(JX,III).GT.XSAVE(JX,JJJ))THEN
+                       ITOT=ITOT+1
+                       XALL(ITOT)=XNUM1/DENOM
+                       KALL(ITOT)=6
+                       ITOT=ITOT+1
+                       XALL(ITOT)=XNUM3/DENOM
+                       KALL(ITOT)=1
+                    ENDIF
+                 ENDIF
+              ENDIF
+           ENDIF
+!
+!
+!
+           IF(XSAVE(JX,III).GT.WS(JX))THEN
+              KTOTAL=KTOTAL+1
+              IF(LDATA(ILEG,JX).EQ.MCUTS(JX,2))THEN
+                 KRITE=KRITE+1
+!
+!  CORRECT TO CORRECT (CASES 1 AND 2)
+!
+                 IF(MRITE(JX,JJJ).EQ.1)THEN
+!  CASE 2
+                    IF(XSAVE(JX,III).LT.XSAVE(JX,JJJ))THEN
+                       ITOT=ITOT+1
+                       XALL(ITOT)=XNUM3/DENOM
+                       KALL(ITOT)=6
+                       ITOT=ITOT+1
+                       XALL(ITOT)=XNUM1/DENOM
+                       KALL(ITOT)=1
+                    ENDIF
+!  CASE 1
+                    IF(XSAVE(JX,III).GT.XSAVE(JX,JJJ))THEN
+                       ITOT=ITOT+1
+                       XALL(ITOT)=XNUM1/DENOM
+                       KALL(ITOT)=6
+                       ITOT=ITOT+1
+                       XALL(ITOT)=XNUM3/DENOM
+                       KALL(ITOT)=1
+                    ENDIF
+                 ENDIF
+!
+!  INCORRECT TO CORRECT (CASE 12)
+!
+                 IF(MRITE(JX,JJJ).EQ.0)THEN
+                    ITOT=ITOT+1
+                    XALL(ITOT)=XNUM1/DENOM
+                    KALL(ITOT)=6
+                    ITOT=ITOT+1
+                    XALL(ITOT)=XNUM3/DENOM
+                    KALL(ITOT)=1
+                 ENDIF
+              ENDIF
+              IF(LDATA(ILEG,JX).EQ.MCUTS(JX,1))THEN
+                 KWRONG=KWRONG+1
+!
+!  CORRECT TO INCORRECT (CASE 10)
+!
+                 IF(MRITE(JX,JJJ).EQ.1)THEN
+                    ITOT=ITOT+1
+                    XALL(ITOT)=XNUM3/DENOM
+                    KALL(ITOT)=6
+                    ITOT=ITOT+1
+                    XALL(ITOT)=XNUM2/DENOM
+                    KALL(ITOT)=1
+                 ENDIF
+!
+!  INCORRECT TO INCORRECT (CASES 5 AND 6)
+!
+                 IF(MRITE(JX,JJJ).EQ.0)THEN
+!  CASE 6
+                    IF(XSAVE(JX,III).LT.XSAVE(JX,JJJ))THEN
+                       ITOT=ITOT+1
+                       XALL(ITOT)=XNUM2/DENOM
+                       KALL(ITOT)=6
+                       ITOT=ITOT+1
+                       XALL(ITOT)=XNUM3/DENOM
+                       KALL(ITOT)=1
+                    ENDIF
+!  CASE 5
+                    IF(XSAVE(JX,III).GT.XSAVE(JX,JJJ))THEN
+                       ITOT=ITOT+1
+                       XALL(ITOT)=XNUM3/DENOM
+                       KALL(ITOT)=6
+                       ITOT=ITOT+1
+                       XALL(ITOT)=XNUM2/DENOM
+                       KALL(ITOT)=1
+                    ENDIF
+                 ENDIF
+              ENDIF
+           ENDIF
+        ENDIF
+ 1      CONTINUE
+      END DO
+!
+!  IMPOSE RANGE CONSTRAINTS ON ALPHA VECTOR -- ROOT2 IS THE LOWER BOUND
+!                                              ROOT1 IS THE UPPER BOUND
+!
+      KK=0
+      DO I=1,ITOT
+        IF(XALL(I).GT.ROOT2.AND.XALL(I).LT.ROOT1)THEN
+           KK=KK+1
+           YALL(KK)=XALL(I)
+           LALL(KK)=KALL(I)
+        ENDIF
+      END DO
+!
+      WSSY=0.0
+      IF(KK.GT.0)THEN
+         CALL KPRSORT(YALL,KK,LALL)
+         IROTC=1
+         CALL JAN0PT(KK,NP,NDUAL,YALL,LALL,WSSY,JCH,JEH,JCL,JEL,IROTC)
+      ENDIF
+!
+!  (Z'Z)-1*Z'W-HAT
+!
+!
+      DO K=1,NS
+        ZWRONG(K)=0.0
+        SUMWS=0.0
+        DO JJ=1,NRCALL
+          SUMWS=SUMWS+BB(K,JJ)*(XSAVE(JJ,JJJ)+ &
+                          WSSY*(XSAVE(JJ,III)-XSAVE(JJ,JJJ)))
+        END DO
+!
+        XMAT2(K)=SUMWS
+      END DO
+!
+      KKRITE=0
+      KKWRONG=0
+      KTOTAL=0
+      XERR2=0.0
+      DO JX=1,NRCALL
+        LERROR(ILEG,JX)=0
+        SUM=0.0
+        DO K=1,NS
+          SUM=SUM+XMAT2(K)*ZVEC(JX,K)
+        END DO
+        XXY(JX)=SUM
+        XXZ(JX)=SUM
+        DB2B1=WS(JX)-XXY(JX)
+!
+!  CALCULATE CLASSIFICATION ERROR
+!
+        IF(LDATA(ILEG,JX).NE.0)THEN
+           IF(XXY(JX).LT.WS(JX))THEN
+              KTOTAL=KTOTAL+1
+              IF(LDATA(ILEG,JX).EQ.MCUTS(JX,1))THEN
+                 KKRITE=KKRITE+1
+              ENDIF
+              IF(LDATA(ILEG,JX).EQ.MCUTS(JX,2))THEN
+                 LERROR(ILEG,JX)=1
+                 KKWRONG=KKWRONG+1
+                 XERR2=XERR2+(XXY(JX)-WS(JX))**2
+                 XXZ(JX)=+1.0
+                 DO K=1,NS
+                   YWRONG(KKWRONG,K)=XMAT2(K)+1.000*DB2B1*ZVEC(JX,K)
+                   ZWRONG(K)=ZWRONG(K)+XMAT2(K)+ &
+                             1.5000*DB2B1*ZVEC(JX,K)
+                 END DO
+              ENDIF
+           ENDIF
+           IF(XXY(JX).GT.WS(JX))THEN
+              KTOTAL=KTOTAL+1
+              IF(LDATA(ILEG,JX).EQ.MCUTS(JX,2))THEN
+                 KKRITE=KKRITE+1
+              ENDIF
+              IF(LDATA(ILEG,JX).EQ.MCUTS(JX,1))THEN
+                 LERROR(ILEG,JX)=1
+                 KKWRONG=KKWRONG+1
+                 XERR2=XERR2+(XXY(JX)-WS(JX))**2
+                 XXZ(JX)=-1.0
+                 DO K=1,NS
+                   YWRONG(KKWRONG,K)=XMAT2(K)+1.000*DB2B1*ZVEC(JX,K)
+                   ZWRONG(K)=ZWRONG(K)+XMAT2(K)+ &
+                             1.5000*DB2B1*ZVEC(JX,K)
+                 END DO
+              ENDIF
+           ENDIF
+        ENDIF
+      END DO
+!
+      DO K=1,NS
+        IF(KKWRONG.GT.0)ZWRONG(K)=ZWRONG(K)/FLOAT(KKWRONG)
+      END DO
+!      IF(ILEG.EQ.5)THEN
+!      WRITE(21,1013)NII,ILEG,KKRITE,KKWRONG,JEH+JEL,KTOTAL,
+!     C                  (XMAT2(K),K=1,3)
+!      ENDIF
+!
+      DEALLOCATE(MRITE)
+      DEALLOCATE(LALL)
+      DEALLOCATE(YALL)
+      DEALLOCATE(XALL)
+      DEALLOCATE(KALL)
+      DEALLOCATE(XXY)
+      DEALLOCATE(XSAVE)
+      RETURN
+      END
+!
+!  **************************************************************************
+!    SUBROUTINE JAN0PT -- FINDS OPTIMAL CUTTING POINT FOR ONE DIMENSION
+!  **************************************************************************
+!
+      SUBROUTINE JAN0PT(KKNP,NP,NDUAL,YSS,KA,WSSY,JCH,JEH,JCL,JEL,IROTC)
+!
+      IMPLICIT DOUBLE PRECISION(A-H,O-Z)
+      INTEGER:: LD=0,LC=0,LA=0,LB=0
+      DOUBLE PRECISION:: AB=0.0,AA=0.0
+      DIMENSION YSS(NDUAL),KA(NDUAL)
+      INTEGER, ALLOCATABLE :: LE(:)
+      INTEGER, ALLOCATABLE :: LJEP(:)
+      INTEGER, ALLOCATABLE :: LV(:)
+      INTEGER, ALLOCATABLE :: LVB(:)
+      INTEGER, ALLOCATABLE :: LEB(:)
+      INTEGER, ALLOCATABLE :: LAJEP(:)
+      INTEGER, ALLOCATABLE :: LBJEP(:)
+      INTEGER, ALLOCATABLE :: LCJEP(:)
+      INTEGER, ALLOCATABLE :: LDJEP(:)
+      INTEGER, ALLOCATABLE :: MJEP(:)
+      DOUBLE PRECISION, ALLOCATABLE :: Z(:)
+      DOUBLE PRECISION, ALLOCATABLE :: Y(:)
+      DOUBLE PRECISION, ALLOCATABLE :: AAJEP(:)
+      DOUBLE PRECISION, ALLOCATABLE :: ABJEP(:)
+      DOUBLE PRECISION, ALLOCATABLE :: ABABJEP(:)
+      ALLOCATE(LE(NDUAL))
+      ALLOCATE(LJEP(NDUAL))
+      ALLOCATE(LV(NDUAL))
+      ALLOCATE(LVB(NDUAL))
+      ALLOCATE(LEB(NDUAL))
+      ALLOCATE(LAJEP(101))
+      ALLOCATE(LBJEP(101))
+      ALLOCATE(LCJEP(101))
+      ALLOCATE(LDJEP(101))
+      ALLOCATE(MJEP(101))
+      ALLOCATE(Z(NDUAL))
+      ALLOCATE(Y(NDUAL))
+      ALLOCATE(AAJEP(101))
+      ALLOCATE(ABJEP(101))
+      ALLOCATE(ABABJEP(101))
+!
+      IF(NP.EQ.1) NP=1  !hack to get rid of warnings
+      NPN=KKNP+1
+      NPP=KKNP-1
+      KCUT=1
+      LCUT=6
+      NOTE=1
+      AA1=0.0
+      AB1=0.0
+      LA1=0
+      LB1=0
+      LC1=0
+      LD1=0
+      AA2=999.0
+      AB2=0.0
+      LA2=0
+      LB2=0
+      LC2=0
+      LD2=0
+      DO III=1,1
+        IF(III.EQ.2)THEN
+           KCUT=6
+           LCUT=1
+        ENDIF
+!
+!  CHECK ALL POSSIBLE INTERIOR CUT POINTS  --  THE NP INPUT POINTS
+!      ARE HELD FIXED.  THERE ARE NP POSSIBLE CUT-POINTS BEGINNING
+!      WITH CUT-POINT 1 WHICH IS .001 UNITS TO THE LEFT OF POINT 1.
+!      CUT-POINT 2 IS BETWEEN POINTS 1 AND 2, ETC.
+!
+!     1   2   3   4   5   6   7   8   9   10   11 ...... NP-1   NP
+!    *  *   *   *   *   *   *   *   *   *    *                *
+!    1  2   3   4   5   6   7   8   9  10   11  ...........  NP
+!
+!  IF KCUT=1 AND LCUT=6, THE FOLLOWING NP PATTERNS ARE TESTED
+!
+! PATTERN
+!   1         6666666666666666666666
+!   2         1666666666666666666666
+!   3         1166666666666666666666
+!   4         1116666666666666666666
+!   5         1111666666666666666666
+!   6         1111166666666666666666
+!   7         1111116666666666666666
+!   .           .....
+!   .           .....
+!   .           .....
+!  NP-1       1111111111111111111166
+!   NP        1111111111111111111116
+!
+!  BECAUSE THE PROGRAM TRIES BOTH KCUT=1/LCUT=6 AND KCUT=6/LCUT=1, THIS
+!  WILL ALSO TEST THE ONE MISSING PATTERN ABOVE, VIZ., ALL "1"S.
+!
+!
+        KSE=0
+        KSV=0
+        LSV=0
+        LSE=0
+        KMARK=1
+        I=0
+ 10     I=I+1
+        IF((I-KKNP-1).GE.0)GO TO 12
+!  61  Z(I)=999.0
+        Z(I)=999.0
+        IF(I.EQ.1)THEN
+           Y(I)=YSS(1)-.001
+        ENDIF
+        IF(I.GT.1)THEN
+           Y(I)=(YSS(I)+YSS(I-1))/2.0
+        ENDIF
+!      IF(KA(I).EQ.9)GO TO 10
+        IF(KMARK.EQ.1)THEN
+           DO J=I,KKNP
+             IF(KA(J).EQ.9)GO TO 3
+             IF((LCUT-KA(J)).EQ.0)GO TO 5
+             IF((KCUT-KA(J)).EQ.0)GO TO 6
+             IF((KCUT-KA(J)).NE.0)GO TO 3
+ 5           LSV=LSV+1
+             GO TO 3
+ 6           LSE=LSE+1
+ 3           CONTINUE
+           END DO
+           KMARK=0
+           GO TO 31
+        ENDIF
+        IF(KA(I-1).EQ.KCUT)THEN
+           KSV=KSV+1
+           LSE=LSE-1
+        ENDIF
+        IF(KA(I-1).EQ.LCUT)THEN
+           KSE=KSE+1
+           LSV=LSV-1
+        ENDIF
+!
+ 31     CONTINUE
+        LJEP(I)=I
+        LV(I)=KSV
+        LVB(I)=LSV
+        LE(I)=KSE
+        LEB(I)=LSE
+        KT=LV(I)+LE(I)+LVB(I)+LEB(I)
+        Z(I)=FLOAT(LE(I)+LEB(I))/FLOAT(KT)
+        GO TO 10
+ 12     CONTINUE
+!
+!  FIND BEST CUT POINT
+!
+        CALL KPRSORT(Z,KKNP,LJEP)
+        KIN=1
+        MJEP(1)=1
+        AAJEP(KIN)=Z(1)
+        ABJEP(KIN)=Y(LJEP(1))
+        ABABJEP(KIN)=ABS(ABJEP(KIN))
+        LAJEP(KIN)=LV(LJEP(1))
+        LBJEP(KIN)=LE(LJEP(1))
+        LCJEP(KIN)=LVB(LJEP(1))
+        LDJEP(KIN)=LEB(LJEP(1))
+!
+!  CHECK IF THERE ARE MULTIPLE CUT-POINTS WITH SAME CLASSIFICATION AND
+!    SELECT THAT CUT-POINT CLOSEST TO THE INTERIOR OF THE SPACE
+!
+        DO I=2,KKNP
+          IF(ABS(Z(1)-Z(I)).LE..000001)THEN
+             KIN=KIN+1
+             MJEP(KIN)=KIN
+             AAJEP(KIN)=Z(I)
+             ABJEP(KIN)=Y(LJEP(I))
+             ABABJEP(KIN)=ABS(ABJEP(KIN))
+             LAJEP(KIN)=LV(LJEP(I))
+             LBJEP(KIN)=LE(LJEP(I))
+             LCJEP(KIN)=LVB(LJEP(I))
+             LDJEP(KIN)=LEB(LJEP(I))
+             IF(KIN.GT.100)GO TO 633
+             GO TO 63
+          ENDIF
+          IF(Z(1).LT.Z(I))GO TO 633
+ 63       CONTINUE
+        END DO
+ 633    CONTINUE
+        IF(KIN.EQ.1)THEN
+           AA=AAJEP(1)
+           AB=ABJEP(1)
+           LA=LAJEP(1)
+           LB=LBJEP(1)
+           LC=LCJEP(1)
+           LD=LDJEP(1)
+        ENDIF
+        IF(KIN.GT.1)THEN
+           CALL KPRSORT(ABABJEP,KIN,MJEP)
+           AA=AAJEP(MJEP(1))
+           AB=ABJEP(MJEP(1))
+           LA=LAJEP(MJEP(1))
+           LB=LBJEP(MJEP(1))
+           LC=LCJEP(MJEP(1))
+           LD=LDJEP(MJEP(1))
+        ENDIF
+!
+        IF(III.EQ.1)THEN
+           AA1=AA
+           AB1=AB
+           LA1=LA
+           LB1=LB
+           LC1=LC
+           LD1=LD
+        ENDIF
+        IF(III.EQ.2)THEN
+           AA2=AA
+           AB2=AB
+           LA2=LA
+           LB2=LB
+           LC2=LC
+           LD2=LD
+        ENDIF
+!
+      END DO
+!
+      IF(AA1.LE.AA2)THEN
+         KCCUT=1
+         LCCUT=6
+         AA=AA1
+         AB=AB1
+         LA=LA1
+         LB=LB1
+         LC=LC1
+         LD=LD1
+      ENDIF
+      IF(AA1.GT.AA2)THEN
+         KCCUT=6
+         LCCUT=1
+         AA=AA2
+         AB=AB2
+         LA=LA2
+         LB=LB2
+         LC=LC2
+         LD=LD2
+      ENDIF
+      IF(IROTC.EQ.1)THEN
+         KCCUT=1
+         LCCUT=6
+         AA=AA1
+         AB=AB1
+         LA=LA1
+         LB=LB1
+         LC=LC1
+         LD=LD1
+      ENDIF
+      WSSY=AB
+      JCL=LA
+      JEL=LB
+      JCH=LC
+      JEH=LD
+!
+      DEALLOCATE(LE)
+      DEALLOCATE(LJEP)
+      DEALLOCATE(LV)
+      DEALLOCATE(LVB)
+      DEALLOCATE(LEB)
+      DEALLOCATE(LAJEP)
+      DEALLOCATE(LBJEP)
+      DEALLOCATE(LCJEP)
+      DEALLOCATE(LDJEP)
+      DEALLOCATE(MJEP)
+      DEALLOCATE(Z)
+      DEALLOCATE(Y)
+      DEALLOCATE(AAJEP)
+      DEALLOCATE(ABJEP)
+      DEALLOCATE(ABABJEP)
+      RETURN
+      END
+!
+! **************************************************************************
+!  SUBROUTINE KPVOLUME2 -- CALCULATES VOLUME OF REGION CONTAINING LEGISLATOR
+!                           POINT
+!
+! **************************************************************************
+!
+      SUBROUTINE KPVOLUME2(NUMMEMBERS,NUMVOTES,&
+                           IX,NS,NP,NRCALL,NDUAL,XMAT,ZVEC,WS,LDATA, &
+                         BBSAVE,KKSAVE,IPRINT)
+      IMPLICIT DOUBLE PRECISION(A-H,O-Z)
+      DIMENSION XMAT(NUMMEMBERS,25),WS(NDUAL),ZVEC(NUMVOTES,25),&
+                LDATA(NUMMEMBERS,NUMVOTES)
+      DOUBLE PRECISION, ALLOCATABLE :: XXY(:)
+      DOUBLE PRECISION, ALLOCATABLE :: TVEC(:,:)
+      DOUBLE PRECISION, ALLOCATABLE :: XXX(:)
+      DOUBLE PRECISION, ALLOCATABLE :: XMAT2(:,:)
+      ALLOCATE(XXY(NRCALL))
+      ALLOCATE(TVEC(NRCALL+111,25))
+      ALLOCATE(XXX(NRCALL))
+      ALLOCATE(XMAT2(NRCALL+111,25))
+! 1000 FORMAT(3I4,20F7.3)
+! 1001 FORMAT(' MAX ITER',3I5,F6.3,2X,100F7.3)
+!
+!      CALL GETTIM(ITIM1,ITIM2,ITIM3,ITIM4)
+!      ISEED=1000*ITIM2+100*ITIM2+1000*ITIM3+200*ITIM4
+!
+!      CALL RNSET(ISEED)
+!
+      IF(IPRINT.EQ.1) IPRINT=1  !hack to get rid of warnings
+      KPDUDE=NP
+      KKSAVE=-99
+      BBSAVE=-999.0
+!
+! PUT POINTS ON CUTTING PLANES CLOSEST TO XI
+!
+      DO LM=1,100
+        SUM=0.0
+        DO K=1,NS
+!      TVEC(LM,K)=(URAND(ISEED)-.50)
+          TVEC(LM,K)=(RNUNF()-.50)
+!      TVEC(LM,K)=(Rand()-.50)
+!      TVEC(LM,K)=0.6
+          SUM=SUM+TVEC(LM,K)**2
+        END DO
+        DO K=1,NS
+          TVEC(LM,K)=TVEC(LM,K)/SQRT(SUM)
+        END DO
+        XINC=.002
+!
+        DO KLM=1,500
+          SUMBIG=0.0
+          DO K=1,NS
+            XMAT2(LM,K)=XMAT(IX,K)+XINC*TVEC(LM,K)
+            SUMBIG=SUMBIG+XMAT2(LM,K)**2
+          END DO
+!
+!  CHECK IF POINT MOVES OUTSIDE HYPERSPHERE
+!
+          IF(SUMBIG.GE.1.0)GO TO 933
+          DO JX=1,NRCALL
+            SUM=0.0
+            SUM1=0.0
+            DO K=1,NS
+              SUM= SUM+ XMAT(IX,K)*ZVEC(JX,K)
+              SUM1=SUM1+XMAT2(LM,K)*ZVEC(JX,K)
+            END DO
+            XXY(JX)=SUM
+            XXX(JX)=SUM1
+!
+!  CHECK IF POINT MOVES OUTSIDE POLYTOPE
+!
+            IF(LDATA(IX,JX).EQ.0)GO TO 108
+            IF(XXY(JX).LT.WS(JX))THEN
+               IF(XXX(JX).GT.WS(JX))GO TO 933
+            ENDIF
+            IF(XXY(JX).GT.WS(JX))THEN
+               IF(XXX(JX).LT.WS(JX))GO TO 933
+            ENDIF
+ 108        CONTINUE
+          END DO
+          XINC=XINC+.001
+        END DO
+!      IF(IPRINT.EQ.1)WRITE(23,1001)IX,KLM,LM,XINC,(XMAT2(LM,K),K=1,NS), &
+!                      (TVEC(LM,K),K=1,NS),(XMAT(IX,K),K=1,NS)
+ 933    CONTINUE
+        SUM=0.0
+        DO K=1,NS
+          SUM=SUM+(XMAT2(LM,K)-XMAT(IX,K))**2
+        END DO
+        SUM=SQRT(SUM)
+        BBSAVE=MAX(BBSAVE,SUM)
+        KKSAVE=MAX0(KKSAVE,KLM)
+!
+      END DO
+      DEALLOCATE(XXY)
+      DEALLOCATE(TVEC)
+      DEALLOCATE(XXX)
+      DEALLOCATE(XMAT2)
+      RETURN
+      END
+!
+!  ************************************************************************
+!    SUBROUTINE KPRSEARCH -- DOES LOCAL SEARCH ON NORMAL VECTORS
+!
+!  ************************************************************************
+!
+      SUBROUTINE KPRSEARCH(NUMMEMBERS,NUMVOTES,&
+                           NP,NRCALL,NS,NDUAL,XINC,JX,NCUT,KPCUT,LPCUT, &
+                      XMAT,ZVEC,WS,KDOWN,KEQUAL,KUP,JXERROR, &
+                      WSNEW,LDATA,LERROR)
+      IMPLICIT DOUBLE PRECISION(A-H,O-Z)
+      DIMENSION XMAT(NUMMEMBERS,25),ZVEC(NUMVOTES,25),WS(NDUAL), &
+                LERROR(NUMMEMBERS,NUMVOTES),LDATA(NUMMEMBERS,NUMVOTES)
+!
+      INTEGER, ALLOCATABLE :: LLL(:)
+      INTEGER, ALLOCATABLE :: MVOTE(:)
+      INTEGER, ALLOCATABLE :: LLV(:)
+      INTEGER, ALLOCATABLE :: LLVB(:)
+      INTEGER, ALLOCATABLE :: LLE(:)
+      INTEGER, ALLOCATABLE :: LLEB(:)
+      INTEGER, ALLOCATABLE :: MM(:)
+      DOUBLE PRECISION, ALLOCATABLE :: XJCH(:)
+      DOUBLE PRECISION, ALLOCATABLE :: XJEH(:)
+      DOUBLE PRECISION, ALLOCATABLE :: XJCL(:)
+      DOUBLE PRECISION, ALLOCATABLE :: XJEL(:)
+      DOUBLE PRECISION, ALLOCATABLE :: ZS(:)
+      DOUBLE PRECISION, ALLOCATABLE :: UUU(:,:)
+      DOUBLE PRECISION, ALLOCATABLE :: XXX(:)
+      DOUBLE PRECISION, ALLOCATABLE :: ZZZ(:)
+      DOUBLE PRECISION, ALLOCATABLE :: ZVEC2(:,:)
+      ALLOCATE(LLL(NDUAL))
+      ALLOCATE(MVOTE(NDUAL))
+      ALLOCATE(LLV(NDUAL))
+      ALLOCATE(LLVB(NDUAL))
+      ALLOCATE(LLE(NDUAL))
+      ALLOCATE(LLEB(NDUAL))
+      ALLOCATE(MM(NP))
+      ALLOCATE(XJCH(25))
+      ALLOCATE(XJEH(25))
+      ALLOCATE(XJCL(25))
+      ALLOCATE(XJEL(25))
+      ALLOCATE(ZS(NDUAL))
+      ALLOCATE(UUU(NDUAL,25))
+      ALLOCATE(XXX(NDUAL))
+      ALLOCATE(ZZZ(NP))
+      ALLOCATE(ZVEC2(NRCALL,25))
+!
+!  210 FORMAT(I5,10F12.3)
+! 1091 FORMAT(' INVERSE MATRIX ERROR',I4,I5,I8,2F10.4)
+! 1099 FORMAT(I3,I5,I3,2I4)
+! 1103 FORMAT(' MIDPOINT DECOMPOSITION',5I6)
+! 1212 FORMAT(I3,I5,7I4)
+! 3909 FORMAT(I5,I3,6I4,2I8,5I5)
+!
+!      XINC=0.05
+!
+      IF(XINC.EQ.1.0) XINC=1.0  !hack to get rid of warnings
+      KDOWN=0
+      KEQUAL=0
+      KUP=0
+      DO IJL=1,NCUT
+        KQUIT=IJL
+!
+!  SET-UP FOR PHASE 2
+!
+        SUM=0.0
+        DO K=1,NS
+!      ZZZ(K)=(URAND(ISEED)-.50)*0.4 + ZVEC(JX,K)
+          ZZZ(K)=(RNUNF()-.50)*0.4 + ZVEC(JX,K)
+!      ZZZ(K)=(Rand()-.50)*0.4 + ZVEC(JX,K)
+!      ZZZ(K)=0.7*0.4 + ZVEC(JX,K)
+          SUM=SUM+ZZZ(K)**2
+        END DO
+        SUM2=0.0
+        DO K=1,NS
+          ZZZ(K)=ZZZ(K)/SQRT(SUM)
+          SUM2=SUM2+(ZVEC(JX,K)-ZZZ(K))**2
+        END DO
+        SUM2=SQRT(SUM2)
+        SUM3=0.0
+        DO K=1,NS
+          ZVEC2(JX,K)=ZVEC(JX,K)+(XINC/SUM2)*(ZZZ(K)-ZVEC(JX,K))
+!      ZVEC2(JX,K)=(Rand()-.50)
+          SUM3=SUM3+ZVEC2(JX,K)**2
+        END DO
+        DO K=1,NS
+          ZVEC2(JX,K)=ZVEC2(JX,K)/SQRT(SUM3)
+        END DO
+!
+        DO K=1,NS
+          UUU(IJL,K)=ZVEC2(JX,K)
+        END DO
+        DO I=1,NP
+          SUM=0.0
+          DO K=1,NS
+            SUM=SUM+XMAT(I,K)*ZVEC2(JX,K)
+          END DO
+!
+!  SAVE PROJECTION VECTORS -- LEGISLATOR BY ROLL CALL MATRIX
+!
+          LLL(I)=I
+          XXX(I)=SUM
+          MM(I)=LDATA(I,JX)
+          IF(LDATA(I,JX).EQ.0)MM(I)=9
+        END DO
+!
+!  SORT PROJECTION VECTOR (Y-HAT)
+!
+!
+        CALL KPRSORT(XXX,NP,LLL)
+        DO I=1,NP
+          MVOTE(I)=MM(LLL(I))
+        END DO
+!
+!
+!  CALCULATE CLASSIFICATION ERRORS FOR BEST SOLUTION FROM PHASE 1
+!
+!
+        JCH=0
+        JEH=0
+        JCL=0
+        JEL=0
+        IROTC=0
+        CALL JAN1PT(NUMMEMBERS,NUMVOTES,&
+                    NP,NRCALL,NP,NRCALL,NS,NDUAL,JX,XMAT,XXX,MVOTE,WS, &
+                    LLV,LLVB,LLE,LLEB,LERROR, &
+                    ZS,JCH,JEH,JCL,JEL,IROTC,KCUT,LCUT,LLL, &
+                    XJCH,XJEH,XJCL,XJEL)
+!
+        IF(JEH+JEL.LT.JXERROR)THEN
+           KDOWN=KDOWN+1
+           JXERROR=JEH+JEL
+           DO K=1,NS
+             ZVEC(JX,K)=ZVEC2(JX,K)
+           END DO
+           WSNEW=WS(JX)
+           KPCUT=KCUT
+           LPCUT=LCUT
+           GO TO 998
+        ENDIF
+        IF(JEH+JEL.EQ.JXERROR)KEQUAL=KEQUAL+1
+        IF(JEH+JEL.GT.JXERROR)KUP=KUP+1
+!
+ 998    CONTINUE
+      END DO
+!
+      DEALLOCATE(LLL)
+      DEALLOCATE(MVOTE)
+      DEALLOCATE(LLV)
+      DEALLOCATE(LLVB)
+      DEALLOCATE(LLE)
+      DEALLOCATE(LLEB)
+      DEALLOCATE(MM)
+      DEALLOCATE(XJCH)
+      DEALLOCATE(XJEH)
+      DEALLOCATE(XJCL)
+      DEALLOCATE(XJEL)
+      DEALLOCATE(ZS)
+      DEALLOCATE(UUU)
+      DEALLOCATE(XXX)
+      DEALLOCATE(ZZZ)
+      DEALLOCATE(ZVEC2)
+      RETURN
+      END
+!
+!  ************************************************************************
+!    SUBROUTINE KPZVECSTRT -- PRODUCES STARTS FOR THE NORMAL VECTORS USING
+!                           SIMPLE OLS
+!
+!  ************************************************************************
+!
+      SUBROUTINE KPZVECSTRT(NUMMEMBERS,NUMVOTES,&
+                            NP,NRCALL,NS,NDUAL,XMAT,ZVEC,LDATA,IPRINT)
+      IMPLICIT DOUBLE PRECISION(A-H,O-Z)
+      DIMENSION XMAT(NUMMEMBERS,25),ZVEC(NUMVOTES,25),&
+                              LDATA(NUMMEMBERS,NUMVOTES)
+!
+      INTEGER, ALLOCATABLE :: MM(:)
+      INTEGER, ALLOCATABLE :: LLL(:)
+      INTEGER, ALLOCATABLE :: IWORK(:)
+      INTEGER, ALLOCATABLE :: MDATA(:,:)
+      DOUBLE PRECISION, ALLOCATABLE :: XXX(:)
+      DOUBLE PRECISION, ALLOCATABLE :: FV1(:)
+      DOUBLE PRECISION, ALLOCATABLE :: FV2(:)
+      DOUBLE PRECISION, ALLOCATABLE :: VCOV(:,:)
+      DOUBLE PRECISION, ALLOCATABLE :: VCOV2(:,:)
+      DOUBLE PRECISION, ALLOCATABLE :: UL(:,:)
+      DOUBLE PRECISION, ALLOCATABLE :: WVEC2(:)
+      DOUBLE PRECISION, ALLOCATABLE :: ZMAT2(:,:)
+      DOUBLE PRECISION, ALLOCATABLE :: ZVEC2(:,:)
+      DOUBLE PRECISION, ALLOCATABLE :: BB(:,:)
+      DOUBLE PRECISION, ALLOCATABLE :: VVV(:,:)
+      DOUBLE PRECISION, ALLOCATABLE :: YY(:)
+      DOUBLE PRECISION, ALLOCATABLE :: V(:)
+      DOUBLE PRECISION, ALLOCATABLE :: WORK(:)
+      ALLOCATE(MM(NP))
+      ALLOCATE(LLL(NP))
+      ALLOCATE(MDATA(NP,NRCALL))
+      ALLOCATE(XXX(NRCALL))
+      ALLOCATE(FV1(NP))
+      ALLOCATE(FV2(NP))
+      ALLOCATE(VCOV(25,25))
+      ALLOCATE(VCOV2(25,25))
+      ALLOCATE(VVV(25,25))
+      ALLOCATE(UL(25,25))
+      ALLOCATE(WVEC2(25))
+      ALLOCATE(ZMAT2(25,25))
+      ALLOCATE(ZVEC2(NRCALL,25))
+      ALLOCATE(BB(25,NP))
+      ALLOCATE(YY(NP))
+      ALLOCATE(V(25))
+      ALLOCATE(IWORK(8*25*25+1875))
+      ALLOCATE(WORK(8*25*25+1875))
+!
+      LWORK=8*25*25+1875
+!
+!  210 FORMAT(I5,10F12.3)
+! 1012 FORMAT(' DECOMPOSITION OF LEGISLATOR MATRIX',3I4)
+! 1091 FORMAT(' INVERSE MATRIX ERROR',F10.4)
+! 1107 FORMAT(' TOTAL NONMISSING AND MISSING OBSERVATIONS',2I8)
+!
+!  FILL IN MISSING MATRIX ENTRIES
+!
+!  FIND 10 CLOSEST VOTERS
+!
+!  IF MISSING VOTE IMPUTE LIKELIEST CHOICE USING NEAREST 5 DISTANCES
+!
+!
+      IF(IPRINT.EQ.1) IPRINT=1  !hack to get rid of warnings
+      IF(NDUAL.EQ.1) NDUAL=1  !hack to get rid of warnings
+      K7MOA=MIN(NP,10)
+      NMISS=0
+      DO JX=1,NRCALL
+        DO I=1,NP
+          MDATA(I,JX)=LDATA(I,JX)
+          IF(LDATA(I,JX).EQ.0)THEN
+             NMISS=NMISS+1
+             DO II=1,NP
+               SUM=0.0
+               DO K=1,NS
+                 SUM=SUM+(XMAT(I,K)-XMAT(II,K))**2
+               END DO
+               FV1(II)=SUM
+               LLL(II)=II
+             END DO
+             CALL KPRSORT(FV1,NP,LLL)
+             MYES=0
+             MNO=0
+             MMISS=0
+             DO K=1,K7MOA
+               IF(LDATA(LLL(K),JX).EQ.0)GO TO 81
+               MMISS=MMISS+1
+               IF(LDATA(LLL(K),JX).EQ.1)MYES=MYES+1
+               IF(LDATA(LLL(K),JX).EQ.6)MNO =MNO +1
+               IF(K.GT.5.AND.MMISS.GT.1)GO TO 82
+ 81            CONTINUE
+             END DO
+ 82          CONTINUE
+             IF(MYES.GE.MNO)MDATA(I,JX)=1
+             IF(MYES.LT.MNO)MDATA(I,JX)=6
+             IF(LDATA(I,JX).NE.0)MDATA(I,JX)=LDATA(I,JX)
+          ENDIF
+        END DO
+      END DO
+      KMISS=NP*NRCALL-NMISS
+!      IF(IPRINT.EQ.1)WRITE(23,1107)KMISS,NMISS
+!
+!
+!    (X'X)
+!
+      DO K=1,NS
+        DO L=1,NS
+          SUM=0.0
+          DO I=1,NP
+            SUM=SUM+XMAT(I,K)*XMAT(I,L)
+          END DO
+          VCOV(K,L)=SUM
+          VCOV2(K,L)=SUM
+        END DO
+      END DO
+!
+!  EIGENVECTOR-EIGENVALUE DECOMPOSITION OF LEGISLATOR COORDINATES
+!
+      CALL DGESDD('S',NS,NS,VCOV2,25,WVEC2,ZMAT2, &
+                 25,VVV,25,WORK,LWORK,IWORK,IRANK)
+!
+!      CALL KPRS(25,NS,VCOV,WVEC2,1,ZMAT2,FV1,FV2,IER)
+!      IF(IPRINT.EQ.1)THEN
+!         WRITE(23,1012)NS,NP,IRANK
+!         DO 37 I=1,NS
+!         WRITE(*,210)I,WVEC2(I),ZMAT2(I,1),ZMAT2(I,2),VVV(I,1),VVV(I,2)
+!         WRITE(23,210)I,WVEC2(I),ZMAT2(I,1),ZMAT2(I,2),VVV(I,1),VVV(I,2)
+!  37     CONTINUE
+!      ENDIF
+!
+!  (X'X)-1
+!
+      DO I=1,NS
+        DO K=1,NS
+          SUM=0.0
+          DO J=1,NS
+!      IF(ABS(WVEC2(NS+1-J)).GT..0001)THEN
+!          SUM=SUM+ZMAT2(K,NS+1-J)*(1.0/WVEC2(NS+1-J))*ZMAT2(I,NS+1-J)
+            IF(ABS(WVEC2(J)).GT..0001)THEN
+                SUM=SUM+ZMAT2(K,J)*(1.0/WVEC2(J))*ZMAT2(I,J)
+            ENDIF
+          END DO
+          UL(I,K)=SUM
+        END DO
+        UL(I,K)=SUM
+      END DO
+!
+!  MATRIX INVERSION CHECK  (X'X)-1(X'X) = I
+!
+      ASUM=0.0
+      DO I=1,NS
+        DO J=1,NS
+          SUM=0.0
+          DO K=1,NS
+            SUM=SUM+UL(J,K)*VCOV(K,I)
+          END DO
+          IF(I.EQ.J)ASUM=ASUM+ABS(1.0-SUM)
+          IF(I.NE.J)ASUM=ASUM+ABS(SUM)
+        END DO
+      END DO
+!      IF(IPRINT.EQ.1)WRITE(23,1091)ASUM
+!
+!  (X'X)-1*X'
+!
+      SUM=0.0
+      DO I=1,NP
+        DO J=1,NS
+          DO JJ=1,NS
+            SUM=SUM+UL(J,JJ)*XMAT(I,JJ)
+          END DO
+          BB(J,I)=SUM
+        END DO
+        BB(J,I)=SUM
+      END DO
+!
+      DO JX=1,NRCALL
+        KYES=0
+        KNO=0
+        YBAR=0.0
+!
+!  GET Y-VECTOR -- YES'S AND NO'S SUCH THAT SUM OF Y = 0 -- ELIMINATES
+!         THE INTERCEPT TERM -- THE IMPUTED YES/NO FROM ABOVE IS USED
+!         FOR MISSING DATA SO THAT THE SAME X MATRIX CAN BE USED FOR
+!         EVERY ROLL CALL
+!
+        DO I=1,NP
+          IF(MDATA(I,JX).EQ.1)KYES=KYES+1
+          IF(MDATA(I,JX).EQ.6)KNO=KNO+1
+        END DO
+        DO I=1,NP
+          IF(MDATA(I,JX).EQ.1)YY(I)=1.0/FLOAT(KYES)
+          IF(MDATA(I,JX).EQ.6)YY(I)=-1.0/FLOAT(KNO)
+        END DO
+!
+!  BETA-HAT = V(.) = (X'X)-1*X'Y = A-1*U'Y
+!
+        DO K=1,NS
+          SUM=0.0
+          DO J=1,NP
+            SUM=SUM+BB(K,J)*YY(J)
+          END DO
+          V(K)=SUM
+        END DO
+!
+!  NORMALIZE BETA VECTOR SO ITS OF UNIT LENGTH -- THIS DEFINES A POINT
+!    ON THE UNIT HYPERSPHERE SO THAT THE BETA-VECTOR CAN BE USED DIRECTLY
+!    TO CALCULATE THE PROJECTION VECTOR Y-HAT BELOW
+!
+        SUM=0.0
+        DO K=1,NS
+          SUM=SUM+V(K)**2
+        END DO
+!
+!
+        DO K=1,NS
+          V(K+NS)=V(K)/SQRT(SUM)
+!
+!  SELECT VECTOR MAPPING SUCH THAT IT IS ON THE + HEMISPHERE
+!
+          IF(V(1).LT.0.0)V(K+NS)=V(K+NS)*(-1.0)
+          ZVEC(JX,K)=V(K+NS)
+        END DO
+!
+      END DO
+!
+      DEALLOCATE(MM)
+      DEALLOCATE(LLL)
+      DEALLOCATE(MDATA)
+      DEALLOCATE(XXX)
+      DEALLOCATE(FV1)
+      DEALLOCATE(FV2)
+      DEALLOCATE(VCOV)
+      DEALLOCATE(VCOV2)
+      DEALLOCATE(UL)
+      DEALLOCATE(WVEC2)
+      DEALLOCATE(ZMAT2)
+      DEALLOCATE(ZVEC2)
+      DEALLOCATE(BB)
+      DEALLOCATE(YY)
+      DEALLOCATE(V)
+      DEALLOCATE(VVV)
+      DEALLOCATE(WORK)
+      DEALLOCATE(IWORK)
+      RETURN
+      END
+!
+!  ************************************************************************
+!    KPEDITH SUBROUTINE--PERFORMS ONE DIMENSION NOMINAL UNFOLDING -- FINDS
+!                      OPTIMAL CLASSIFICATIONS FOR MATRIX OF SENATE
+!                      PAIRS
+!  ************************************************************************
+!
+      SUBROUTINE KPEDITH(NUMMEMBERS,NUMVOTES,&
+                         NP,NRCALL,NS,NDUAL,XMAT,X,XPT,ZPT,AB,KTOTC, &
+                       KCUTTER,LCUTTER,LERROR,LDATA,MSUM,IPRINT)
+      IMPLICIT DOUBLE PRECISION(A-H,O-Z)
+      DIMENSION X(NDUAL),XYM(NRCALL),XNM(NRCALL),YSS(NDUAL), &
+                KA(NDUAL),WS(NDUAL),L(NDUAL),LL(NDUAL), &
+                LERROR(NUMMEMBERS,NUMVOTES),XMAT(NUMMEMBERS,25),&
+                ZS(NDUAL), &
+                LLV(NDUAL),LLE(NDUAL),LLVB(NDUAL),LLEB(NDUAL), &
+                KKA(NDUAL),KYES(NRCALL),KNO(NRCALL),XCTL(50), &
+                LV(NDUAL),MM(NDUAL),ZPT(NUMVOTES),XPT(NDUAL), &
+                YS(NDUAL),KCUTTER(NUMVOTES),LCUTTER(NUMVOTES), &
+                XJCH(25),XJEH(25),XJCL(25),XJEL(25), &
+                YSJAVA(NDUAL),MMJAVA(NDUAL),LJAVA(NDUAL), &
+                LDATA(NUMMEMBERS,NUMVOTES)
+      DOUBLE PRECISION:: XBAD=0.0
+      INTEGER:: KK=0
+!
+!  330 FORMAT(' WARNING--MISMATCH ON NUMBER OF VOTES READ',2I5)
+!  340 FORMAT(' WARNING--MISMATCH ON ERROR PERCENTAGES',I5,2F7.3)
+!  825 FORMAT(I4,I5,2I7,6F7.3)
+! 8250 FORMAT(I3,' ROLL CALLS ',I3,2I8,5F7.3)
+! 8251 FORMAT(I3,' ROLL CALLS ',I3,2I8,5F9.5)
+! 8252 FORMAT(I3,' LEGISLATORS',I3,2I8,8F9.5)
+! 8253 FORMAT(I3,' LEGISLATORS',I3,2I8,6F7.3)
+!
+      IF(IPRINT.EQ.1) IPRINT=1  !hack to get rid of warnings
+      CALL ECHOEVENT(12)
+      CALL FLUSHCON()
+      CALL PROCEVENT()
+      KSTOPR=1
+      KSTOP=14
+      NV=NRCALL
+      DO I=1,NP
+        YSS(I)=X(I)
+        XPT(I)=X(I)
+        L(I)=I
+        LL(I)=I
+!      WRITE(11,6655)I,X(I),YSS(I),XPT(I),L(I),LL(I)
+! 6655 FORMAT(I4,3F10.4,2I6)
+      END DO
+!
+      CALL KPRSORT(YSS,NP,LL)
+!
+!
+      ITR=0
+ 121  CONTINUE
+      ITR=ITR+1
+      XLOW=YSS(1)
+      XHIGH=YSS(NP)
+      KT=0
+      KTT=0
+      JCH=0
+      JEH=0
+      JCL=0
+      JEL=0
+      MSUM=0
+      NSUM=0
+      IVOT=0
+      NUNAM=0
+!
+!
+!  ROLL CALL LOOP -- ESTIMATE BEST CUTTING POINT GIVEN FIXED LEGISLATOR
+!                    CONFIGURATION
+!
+!      CALL ECHOEVENT(13)
+!      CALL FLUSHCON()
+!      CALL PROCEVENT()
+      DO IIII=1,NV
+        IVOT=IVOT+1
+        ESUM=0.0
+        FSUM=0.0
+        KSUM=0
+        LSUM=0
+!
+!  RECODE AND COMPUTE YES AND NO MEANS
+!
+        DO J=1,NP
+          LV(J)=LDATA(J,IVOT)
+          IF(LV(J).EQ.1.OR.LV(J).EQ.2.OR.LV(J).EQ.3)KK=1
+          IF(LV(J).EQ.4.OR.LV(J).EQ.5.OR.LV(J).EQ.6)KK=6
+          IF(LV(J).EQ.0.OR.LV(J).EQ.7.OR.LV(J).EQ.8.OR.LV(J).EQ.9)KK=9
+          KKA(J)=KK
+          IF(KK.EQ.1)ESUM=ESUM+XPT(J)
+          IF(KK.EQ.1)KSUM=KSUM+1
+          IF(KK.EQ.6)LSUM=LSUM+1
+          IF(KK.EQ.6)FSUM=FSUM+XPT(J)
+        END DO
+        DO J=1,NP
+          KA(J)=KKA(LL(J))
+        END DO
+        KYES(IVOT)=KSUM
+        KNO(IVOT)=LSUM
+!
+!  CHECK FOR UNANIMOUS VOTES AND DISCARD THEM
+!
+        IF(KSUM.EQ.0.OR.LSUM.EQ.0)XYM(IVOT)=99.0
+        IF(KSUM.EQ.0.OR.LSUM.EQ.0)XNM(IVOT)=99.0
+        IF(KSUM.EQ.0.OR.LSUM.EQ.0)NUNAM=NUNAM+1
+        IF(KSUM.EQ.0.OR.LSUM.EQ.0)GO TO 600
+!
+!  STORE YES AND NO MEANS
+!
+        XYM(IVOT)=ESUM/FLOAT(KSUM)
+        XNM(IVOT)=FSUM/FLOAT(LSUM)
+!
+!  CUMULATIVE SUM OF MAJORITY VOTE BY ROLL CALL
+!
+        IF((KSUM-LSUM).LT.0)GO TO 201
+!  202 MSUM=MSUM+KSUM
+        MSUM=MSUM+KSUM
+        GO TO 203
+ 201    MSUM=MSUM+LSUM
+ 203    CONTINUE
+!
+!  BEGIN JANICE LOOP FOR ROLL CALLS
+!
+!  GET ONE POINT RESULTS
+!
+        JCH=0
+        JEH=0
+        JCL=0
+        JEL=0
+        KJAVA=0
+        DO JAVA=1,NP
+          IF(KA(JAVA).NE.9)THEN
+            KJAVA=KJAVA+1
+            YSJAVA(KJAVA)=YSS(JAVA)
+            MMJAVA(KJAVA)=KA(JAVA)
+            LJAVA(KJAVA)=LL(JAVA)
+          ENDIF
+        END DO
+        YSJAVA(KJAVA+1)=YSJAVA(KJAVA)+.01
+        MMJAVA(KJAVA+1)=9
+        LJAVA(KJAVA+1)=NP+1
+        NV1=KJAVA+1
+        IROTC=0
+!
+        CALL JAN1PT(NUMMEMBERS,NUMVOTES,&
+                    NV1,NV,NP,NRCALL,NS,NDUAL,IVOT,XMAT,YSJAVA,MMJAVA,WS, &
+                    LLV,LLVB,LLE,LLEB,LERROR, &
+                    ZS,JCH,JEH,JCL,JEL,IROTC,KCUT,LCUT,LJAVA, &
+                    XJCH,XJEH,XJCL,XJEL)
+        KT=KT+JCH+JCL+JEH+JEL
+        KTT=KTT+JEH+JEL
+        KTOTC=KT
+        KCUTTER(IVOT)=KCUT
+        LCUTTER(IVOT)=LCUT
+!
+!  END OF ROLL CALL LOOP
+!
+ 600    CONTINUE
+      END DO
+!
+!
+      XT=FLOAT(KT)
+      XTT=FLOAT(KTT)
+      AB=1.0-(XTT/XT)
+      XSUM=FLOAT(MSUM)
+      XSUM=XSUM/XT
+      YSUM=AB-XSUM
+      PRE1=YSUM/(1.0-XSUM)
+!
+!  WRITE OUT: ITERATION #; NUMBER OF VOTES;
+!             TOTAL CHOICES; TOTAL ERROR CHOICES; PERCENT CORRECT;
+!             PERCENT MAJORITY MODEL; PROPORTIONAL REDUCTION IN ERROR
+!
+!      IF(NS.GT.1.AND.IPRINT.EQ.1)THEN
+!         WRITE(23,825)ITR,IVOT,KT,KTT,AB,XSUM,PRE1,XLOW,XHIGH
+!      ENDIF
+!      IF(NS.EQ.1.AND.IPRINT.EQ.1)THEN
+!         WRITE(23,8251)ITR,NS,KTT,KT,1.0-AB,AB,PRE1
+!      ENDIF
+!      IF(IVOT.NE.NV)THEN
+!         WRITE(*,330)IVOT,NV
+!         STOP
+!      ENDIF
+      XCTL(ITR)=AB
+!
+!
+!
+!  WRITE ROLL CALL MARGINS AND ERRORS TO DISK
+!
+      DO I=1,NV
+        IF(KYES(I).LE.KNO(I))KMIN=KYES(I)
+        IF(KYES(I).GT.KNO(I))KMIN=KNO(I)
+        KRITE=LLV(I)+LLVB(I)
+        KWRONG=LLE(I)+LLEB(I)
+        IF((KRITE+KWRONG).GT.0.0)XBAD=FLOAT(KWRONG)/FLOAT(KRITE+KWRONG)
+        IF(KYES(I).EQ.0.OR.KNO(I).EQ.0)XBAD=0.0
+        IF(KYES(I).EQ.0.OR.KNO(I).EQ.0)ZS(I)=0.0
+        XMIN=0.0
+        IF((KYES(I)+KNO(I)).GT.0)XMIN=FLOAT(KMIN)/FLOAT(KYES(I)+KNO(I))
+!      IF(ABS(XBAD-ZS(I)).GT..001)THEN
+!         WRITE(*,340)I,XBAD,ZS(I)
+!         STOP
+!      ENDIF
+        AAA=ABS(WS(I)-XLOW)
+        BBB=ABS(WS(I)-XHIGH)
+        IF(XBAD.GT.XMIN.AND.AAA.LT.BBB)WS(I)=XLOW
+        IF(XBAD.GT.XMIN.AND.AAA.GE.BBB)WS(I)=XHIGH
+        IF(XBAD.GT.XMIN)XBAD=XMIN
+        IF(KYES(I).EQ.0.OR.KNO(I).EQ.0)WS(I)=0.0
+        IF(KSTOPR.EQ.1)GO TO 130
+!
+!  WRITE OUT CONGRESS #, VOTE #, YES #, NO #, PROPORTION IN MINORITY,
+!            PROPORTION ERROR, CUT POINT
+!
+!      WRITE(11,800)I,KYES(I),KNO(I),XMIN,XBAD,WS(I),XYM(I),XNM(I)
+!  800 FORMAT(I5,2I6,5F7.3)
+ 130    CONTINUE
+      END DO
+!
+!
+!
+!  BEGIN JANICE LOOP FOR LEGISLATORS
+!
+!
+!
+!      CALL ECHOEVENT(14)
+!      CALL FLUSHCON()
+!      CALL PROCEVENT()
+      ITR=ITR+1
+      DO I=1,NV
+        YS(I)=WS(I)
+        ZPT(I)=WS(I)
+        L(I)=I
+      END DO
+!
+!  SORT ROLL CALL MIDPOINTS
+!
+      CALL KPRSORT(YS,NV,L)
+!
+      KT=0
+      KTT=0
+      JCH=0
+      JCL=0
+      JEH=0
+      JEL=0
+      DO I=1,NP
+        IVOT=I
+!
+!
+        DO J=1,NV
+          LV(J)=LDATA(IVOT,J)
+          IF(LV(J).EQ.1.OR.LV(J).EQ.2.OR.LV(J).EQ.3)KK=1
+          IF(LV(J).EQ.4.OR.LV(J).EQ.5.OR.LV(J).EQ.6)KK=6
+          IF(LV(J).EQ.0.OR.LV(J).EQ.7.OR.LV(J).EQ.8.OR.LV(J).EQ.9)KK=9
+          IF(XYM(J).EQ.99.0.OR.XNM(J).EQ.99.0)KK=9
+          KA(J)=KK
+        END DO
+!
+!  DETERMINE DIRECTIONALITY FOR EACH MIDPOINT -- STORE IN MM VECTOR
+!
+!
+!  CUMULATIVE SUM OF MAJORITY VOTE BY INDIVIDUALS
+!
+        DO J=1,NV
+!      IF(XYM(L(J))-XNM(L(J)))163,162,162
+!  163 KCUT=1
+!      LCUT=6
+!      GO TO 164
+!  162 KCUT=6
+!      LCUT=1
+           KCUT=KCUTTER(L(J))
+           LCUT=LCUTTER(L(J))
+!
+!  NOTE THAT THIS CODING OF MM(.) PRODUCES THE PATTERNS
+!
+!          6666666666...
+!          1666666666...
+!          1166666666...
+!          1116666666...
+!          1111666666...
+!          1111166666...
+!
+!  ETC., IF THE LEGISLATOR IS VOTING PERFECTLY
+!
+!  164 IF(KA(L(J)).EQ.KCUT)MM(J)=6
+          IF(KA(L(J)).EQ.KCUT)MM(J)=6
+          IF(KA(L(J)).EQ.LCUT)MM(J)=1
+          IF(KA(L(J)).EQ.9)MM(J)=9
+          IF(KYES(L(J)).LT.KNO(L(J)).AND.KA(L(J)).EQ.6)NSUM=NSUM+1
+          IF(KYES(L(J)).GE.KNO(L(J)).AND.KA(L(J)).EQ.1)NSUM=NSUM+1
+        END DO
+!
+!  GET ONE POINT RESULTS
+!
+        JCH=0
+        JEH=0
+        JCL=0
+        JEL=0
+        KJAVA=0
+        DO JAVA=1,NV
+          IF(MM(JAVA).NE.9)THEN
+            KJAVA=KJAVA+1
+            YSJAVA(KJAVA)=YS(JAVA)
+            MMJAVA(KJAVA)=MM(JAVA)
+            LJAVA(KJAVA)=L(JAVA)
+          ENDIF
+        END DO
+!
+!  TRICK JANICE TO FIX ROLL CALL PROBLEM
+!
+        YSJAVA(KJAVA+1)=YSJAVA(KJAVA)+.01
+        MMJAVA(KJAVA+1)=9
+        LJAVA(KJAVA+1)=NV+1
+        NV1=KJAVA+1
+        IROTC=1
+!
+        CALL JAN1PT(NUMMEMBERS,NUMVOTES,&
+                    NV1,NP,NP,NRCALL,NS,NDUAL,IVOT,XMAT,YSJAVA,MMJAVA,WS, &
+                    LLV,LLVB,LLE,LLEB,LERROR, &
+                    ZS,JCH,JEH,JCL,JEL,IROTC,KCUT,LCUT,LJAVA, &
+                    XJCH,XJEH,XJCL,XJEL)
+        KT=KT+JCH+JCL+JEH+JEL
+        KTT=KTT+JEH+JEL
+!
+!  END OF LEGISLATOR LOOP
+!
+      END DO
+!
+!  CALCULATE REGRESSION OF PREVIOUS LEGISLATOR CONFIGURATION ON
+!        CURRENT LEGISLATOR CONFIGURATION
+!
+      ASUM=0.0
+      BSUM=0.0
+      CSUM=0.0
+      DSUM=0.0
+      ESUM=0.0
+      KKNP=0
+      DO I=1,NP
+        LL(I)=I
+!
+        YSS(I)=WS(I)
+        KKNP=KKNP+1
+        ASUM=ASUM+XPT(I)*WS(I+NP)
+        BSUM=BSUM+XPT(I)
+        CSUM=CSUM+WS(I+NP)
+        DSUM=DSUM+XPT(I)*XPT(I)
+        ESUM=ESUM+WS(I+NP)*WS(I+NP)
+        XPT(I)=WS(I)
+      END DO
+      AA=FLOAT(KKNP)*ASUM-BSUM*CSUM
+      BB=FLOAT(KKNP)*DSUM-BSUM*BSUM
+      CC=FLOAT(KKNP)*ESUM-CSUM*CSUM
+      IF(BB*CC.GT.0.0)RR=(AA*AA)/(BB*CC)
+      BETA=AA/CC
+      ALFA=(BSUM-BETA*CSUM)/FLOAT(KKNP)
+      XT=FLOAT(KT)
+      XTT=FLOAT(KTT)
+      AB=1.0-(XTT/XT)
+      XSUM=FLOAT(NSUM)/FLOAT(KT)
+      YSUM=AB-XSUM
+      PRE=YSUM/(1.0-XSUM)
+      NUNP=NP-KKNP
+!
+!  WRITE OUT: ITERATION #; NUMBER OF LEGISLATORS;
+!             TOTAL CHOICES; TOTAL ERROR CHOICES; PERCENT CORRECT;
+!             PERCENT MAJORITY MODEL; PROPORTIONAL REDUCTION IN ERROR
+!
+!      IF(NS.GT.1.AND.IPRINT.EQ.1)THEN
+!         WRITE(23,825)ITR,NP,KT,KTT,AB,XSUM,PRE,ALFA,BETA,RR
+!      ENDIF
+!      IF(NS.EQ.1.AND.IPRINT.EQ.1)THEN
+!         WRITE(23,8252)ITR,NS,KTT,KT,1.0-AB,AB,PRE,SQRT(RR)
+!      ENDIF
+      XCTL(ITR)=AB
+!
+!  WRITE LEGISLATOR MARGINS TO DISK
+!
+      DO I=1,NP
+        KHIGH=LLV(I)+LLE(I)
+        KLOW=LLVB(I)+LLEB(I)
+        IF(KHIGH.LE.KLOW)XMIN=FLOAT(KHIGH)/FLOAT(KHIGH+KLOW)
+        IF(KHIGH.GT.KLOW)XMIN=FLOAT(KLOW)/FLOAT(KHIGH+KLOW)
+        XBAD=FLOAT(LLE(I)+LLEB(I))/FLOAT(KHIGH+KLOW)
+        AAA=ABS(WS(I)-XLOW)
+        BBB=ABS(WS(I)-XHIGH)
+        IF(XBAD.GT.XMIN.AND.AAA.LT.BBB)WS(I)=XLOW
+        IF(XBAD.GT.XMIN.AND.AAA.GE.BBB)WS(I)=XHIGH
+        IF(XBAD.GT.XMIN)XBAD=XMIN
+!  729 CONTINUE
+        CONTINUE
+        IF(KSTOPR.EQ.1)GO TO 128
+!      WRITE(11,800)I,KHIGH,KLOW,XMIN,XBAD,WS(I)
+ 128    CONTINUE
+      END DO
+      CALL KPRSORT(YSS,NP,LL)
+      AA=(YSS(1)+YSS(NP))/2.0
+      BB=YSS(NP)-AA
+      DO I=1,NP
+        YSS(I)=(YSS(I)-AA)/BB
+        XPT(I)=(XPT(I)-AA)/BB
+        WS(I)=(WS(I)-AA)/BB
+        WS(I+NP)=WS(I)
+      END DO
+      IF(ITR.LE.5)GO TO 121
+      IF(KSTOPR.EQ.0)RETURN
+      IF((XCTL(ITR)-XCTL(ITR-2)).LE..0001)KSTOPR=0
+      IF(ITR.LE.KSTOP)GO TO 121
+      RETURN
+      END
+!
+!
+!  ***********************************************************************
+!     SUBROUTINE KPPERM---GENERATES THE SEQUENCE OF PERMUTATIONS OF N
+!         DISTINGUISHABLE OBJECTS, ONE AT A TIME, IN LEXOGRAPHIC ORDER.
+!  ***********************************************************************
+!
+!
+      SUBROUTINE KPPERM(N,K,M)
+      IMPLICIT DOUBLE PRECISION(A-H,O-Z)
+      DIMENSION K(N),M(N)
+!
+!  AT FIRST CALL M(1)=0
+!
+!  K CONTAINS THE VECTOR THAT IS TO BE PERMUTED
+!
+      IF(M(1).NE.0)GO TO 2
+      DO I=2,N
+        M(I)=1
+      END DO
+ 2    M(1)=M(1)+1
+      IF(M(2).NE.1)GO TO 3
+      M(2)=2
+      J=K(1)
+      K(1)=K(2)
+      K(2)=J
+      RETURN
+ 3    DO I=2,N
+        IF(M(I).NE.I)GO TO 5
+        M(I)=1
+      END DO
+      M(1)=0
+      I=N
+      GO TO 6
+ 5    L=M(I)
+      J=K(L)
+      K(L)=K(I)
+      K(I)=J
+      M(I)=L+1
+      I=I-1
+ 6    L=1
+ 7    J=K(L)
+      K(L)=K(I)
+      K(I)=J
+      L=L+1
+      I=I-1
+      IF(L.LT.I)GO TO 7
+      RETURN
+      END
+!
+!
+!  ********************************************************************
+!    SUBROUTINE KPSHARPEN -- PERMUTES BLOCKS OF 5-ADJACENT LEGISLATORS
+!                            TO SHARPEN THE RANK ORDERING
+!  ********************************************************************
+!
+      SUBROUTINE KPSHARPEN(NUMMEMBERS,NUMVOTES,&
+                           NNPERM,NP,NRCALL,NS,NDUAL,KCUTTER,LCUTTER, &
+                          XMAT0,ZPT,WS,LDATA,LERROR,IPRINT)
+      IMPLICIT DOUBLE PRECISION(A-H,O-Z)
+!
+      DIMENSION KCUTTER(NUMVOTES),LCUTTER(NUMVOTES),&
+                XMAT0(NUMMEMBERS,25), &
+                ZPT(NUMVOTES),WS(NDUAL),LDATA(NUMMEMBERS,NUMVOTES), &
+                LERROR(NUMMEMBERS,NUMVOTES),XMAT(NUMMEMBERS,25)
+      INTEGER:: KK=0
+!
+      INTEGER, ALLOCATABLE :: KPERM(:)
+      INTEGER, ALLOCATABLE :: MPERM(:)
+      INTEGER, ALLOCATABLE :: KBIGPERM(:,:)
+      INTEGER, ALLOCATABLE :: MMJAVA(:)
+      INTEGER, ALLOCATABLE :: LLV(:)
+      INTEGER, ALLOCATABLE :: LLVB(:)
+      INTEGER, ALLOCATABLE :: LLE(:)
+      INTEGER, ALLOCATABLE :: LLEB(:)
+      INTEGER, ALLOCATABLE :: L(:)
+      INTEGER, ALLOCATABLE :: LL(:)
+      INTEGER, ALLOCATABLE :: LJAVA(:)
+      INTEGER, ALLOCATABLE :: LV(:)
+      INTEGER, ALLOCATABLE :: KKA(:)
+      INTEGER, ALLOCATABLE :: KA(:)
+      INTEGER, ALLOCATABLE :: LLSAVE(:)
+      INTEGER, ALLOCATABLE :: LTEST(:)
+      INTEGER, ALLOCATABLE :: LORDER(:)
+      INTEGER, ALLOCATABLE :: MERROR(:,:)
+      INTEGER, ALLOCATABLE :: MMSAVE(:,:)
+      DOUBLE PRECISION, ALLOCATABLE :: XLTEST(:)
+      DOUBLE PRECISION, ALLOCATABLE :: YSS(:)
+      DOUBLE PRECISION, ALLOCATABLE :: YSJAVA(:)
+      DOUBLE PRECISION, ALLOCATABLE :: ZS(:)
+      DOUBLE PRECISION, ALLOCATABLE :: YSSS(:)
+      DOUBLE PRECISION, ALLOCATABLE :: XJCH(:)
+      DOUBLE PRECISION, ALLOCATABLE :: XJEH(:)
+      DOUBLE PRECISION, ALLOCATABLE :: XJCL(:)
+      DOUBLE PRECISION, ALLOCATABLE :: XJEL(:)
+      ALLOCATE(KPERM(5))
+      ALLOCATE(MPERM(5))
+      ALLOCATE(KBIGPERM(120,5))
+      ALLOCATE(MMJAVA(NDUAL))
+      ALLOCATE(LLV(NDUAL))
+      ALLOCATE(LLVB(NDUAL))
+      ALLOCATE(LLE(NDUAL))
+      ALLOCATE(LLEB(NDUAL))
+      ALLOCATE(L(NDUAL))
+      ALLOCATE(LL(NDUAL))
+      ALLOCATE(LJAVA(NDUAL))
+      ALLOCATE(LV(NDUAL))
+      ALLOCATE(KKA(NDUAL))
+      ALLOCATE(KA(NDUAL))
+      ALLOCATE(LLSAVE(NDUAL))
+      ALLOCATE(LTEST(2*NDUAL))
+      ALLOCATE(XLTEST(2*NDUAL))
+      ALLOCATE(LORDER(2*NDUAL))
+      ALLOCATE(MERROR(NP,NRCALL))
+      ALLOCATE(MMSAVE(NP,NDUAL))
+      ALLOCATE(YSS(NDUAL))
+      ALLOCATE(YSJAVA(NDUAL))
+      ALLOCATE(ZS(NDUAL))
+      ALLOCATE(YSSS(NDUAL))
+      ALLOCATE(XJCH(25))
+      ALLOCATE(XJEH(25))
+      ALLOCATE(XJCL(25))
+      ALLOCATE(XJEL(25))
+!
+!  100 FORMAT(I6,20I3)
+!  101 FORMAT(I4,F10.4,3I4)
+!  102 FORMAT(' INITIAL ERROR  ',2I7)
+!  103 FORMAT(' BETTER SOLUTION',4I7,I5,10I4)
+!  104 FORMAT(I4,2F10.4)
+!  105 FORMAT(' SAME SOLUTION  ',4I7)
+! 8250 FORMAT(I4,' ROLL CALLS ',I3,2I8,3F7.3,10I4)
+!
+!  KPERM(.) IS THE VECTOR TO BE PERMUTED
+!  MPERM(.) IS A WORK VECTOR.  AT THE FIRST CALL OF KPPERM(N,K,M),
+!    MPERM(1)=0.  IT IS THEN USED AS A FLAG TO DETERMINE WHEN
+!    THE LAST OF THE N! PERMUTATIONS ARE COMPLETED.  IF SO,
+!    THEN MPERM(1)=0 IF THE LAST PERMUTATION IS PASSED BACK
+!
+      ZPT=ZPT       !hack to get rid of warnings
+      IF(IPRINT.EQ.1) IPRINT=1  !hack to get rid of warnings
+      NV=NRCALL
+      N=NNPERM
+      KBEFORE=0
+      DO IIJJ=1,NP-N
+!
+!  INITIALIZE ERROR
+!
+        KINITIAL=0
+        DO J=1,NRCALL
+          DO I=1,NP
+            KINITIAL=KINITIAL+LERROR(I,J)
+            MERROR(I,J)=LERROR(I,J)
+          END DO
+        END DO
+!
+!      IF(IPRINT.EQ.1)WRITE(23,102)IIJJ,KINITIAL
+        MPERM(1)=0
+        DO I=1,N
+          KPERM(I)=I
+        END DO
+!
+        KKK=0
+ 999    CONTINUE
+        KKK=KKK+1
+        CALL KPPERM(N,KPERM,MPERM)
+        DO I=1,N
+          KBIGPERM(KKK,I)=KPERM(I)
+        END DO
+!
+!  CHECK CURRENT PERMUTATION OF THE LEGISLATORS
+!
+        DO I=1,NP
+          YSS(I)=XMAT0(I,1)
+          YSSS(I)=XMAT0(I,1)
+          L(I)=I
+          LL(I)=I
+        END DO
+!
+        CALL KPRSORT(YSS,NP,LL)
+        CALL KPRSORT(YSSS,NP,L)
+!
+!  PERMUTE THE ORDERING BY "TRICKING" LL(.) USING KPERM(.)
+!
+        DO I=1,N
+          LLSAVE(I)=LL(KPERM(I)+KBEFORE)
+        END DO
+        DO I=1,N
+          LL(I+KBEFORE)=LLSAVE(I)
+        END DO
+        DO I=1,NP
+!      WRITE(22,101)I,YSS(I),LL(I),L(I)
+          MMSAVE(I,KKK)=LL(I)
+        END DO
+        KT=0
+        KTT=0
+        JCH=0
+        JEH=0
+        JCL=0
+        JEL=0
+        MSUM=0
+        NSUM=0
+        IVOT=0
+!
+!
+!  ROLL CALL LOOP -- ESTIMATE BEST CUTTING POINT GIVEN FIXED LEGISLATOR
+!                    CONFIGURATION
+!
+        DO IIII=1,NV
+          IVOT=IVOT+1
+          KSUM=0
+          LSUM=0
+!
+!  RECODE AND COMPUTE YES AND NO MEANS
+!
+          DO J=1,NP
+            LV(J)=LDATA(J,IVOT)
+            IF(LV(J).EQ.1.OR.LV(J).EQ.2.OR.LV(J).EQ.3)KK=1
+            IF(LV(J).EQ.4.OR.LV(J).EQ.5.OR.LV(J).EQ.6)KK=6
+            IF(LV(J).EQ.0.OR.LV(J).EQ.7.OR.LV(J).EQ.8.OR.LV(J).EQ.9)KK=9
+            KKA(J)=KK
+            IF(KK.EQ.1)KSUM=KSUM+1
+            IF(KK.EQ.6)LSUM=LSUM+1
+          END DO
+          DO J=1,NP
+            KA(J)=KKA(LL(J))
+          END DO
+!
+!  CHECK FOR UNANIMOUS VOTES AND DISCARD THEM
+!
+          IF(KSUM.EQ.0.OR.LSUM.EQ.0)GO TO 600
+!
+!  CUMULATIVE SUM OF MAJORITY VOTE BY ROLL CALL
+!
+          IF((KSUM-LSUM).LT.0)GO TO 201
+!  202 MSUM=MSUM+KSUM
+          MSUM=MSUM+KSUM
+          GO TO 203
+ 201      MSUM=MSUM+LSUM
+ 203      CONTINUE
+!
+!  BEGIN JANICE LOOP FOR ROLL CALLS
+!
+!  GET ONE POINT RESULTS
+!
+          JCH=0
+          JEH=0
+          JCL=0
+          JEL=0
+          KJAVA=0
+          DO JAVA=1,NP
+            IF(KA(JAVA).NE.9)THEN
+              KJAVA=KJAVA+1
+              YSJAVA(KJAVA)=YSS(JAVA)
+              MMJAVA(KJAVA)=KA(JAVA)
+              LJAVA(KJAVA)=LL(JAVA)
+            ENDIF
+          END DO
+          YSJAVA(KJAVA+1)=YSJAVA(KJAVA)+.01
+          MMJAVA(KJAVA+1)=9
+          LJAVA(KJAVA+1)=NP+1
+          NV1=KJAVA+1
+          IROTC=0
+          CALL JAN1PT(NUMMEMBERS,NUMVOTES,&
+                      NV1,NV,NP,NRCALL,NS,NDUAL,IVOT,XMAT,YSJAVA,MMJAVA,WS, &
+                      LLV,LLVB,LLE,LLEB,LERROR, &
+                      ZS,JCH,JEH,JCL,JEL,IROTC,KCUT,LCUT,LJAVA, &
+                      XJCH,XJEH,XJCL,XJEL)
+          KT=KT+JCH+JCL+JEH+JEL
+          KTT=KTT+JEH+JEL
+          KTOTC=KT
+          KCUTTER(IVOT)=KCUT
+          LCUTTER(IVOT)=LCUT
+!
+!  END OF ROLL CALL LOOP
+!
+ 600      CONTINUE
+        END DO
+!
+!
+        XT=FLOAT(KT)
+        XTT=FLOAT(KTT)
+        AB=1.0-(XTT/XT)
+        XSUM=FLOAT(MSUM)
+        XSUM=XSUM/XT
+        YSUM=AB-XSUM
+        PRE1=YSUM/(1.0-XSUM)
+!
+!  WRITE OUT: ITERATION #; NUMBER OF VOTES;
+!             TOTAL CHOICES; TOTAL ERROR CHOICES; PERCENT CORRECT;
+!             PERCENT MAJORITY MODEL; PROPORTIONAL REDUCTION IN ERROR
+!
+!      WRITE(*,8250)KKK,NS,KTT,KT,1.0-AB,AB,PRE1,(KBIGPERM(KKK,J),J=1,N)
+        LTEST(KKK)=KTT
+        XLTEST(KKK)=FLOAT(KTT)
+        LORDER(KKK)=KKK
+!
+!      WRITE(11,100)KKK,(KBIGPERM(KKK,J),J=1,N)
+        IF(MPERM(1).NE.0)GO TO 999
+!
+!  IF A BETTER SOLUTION IS FOUND RESET THE ORIGINAL ORDERING
+!
+        CALL KPRSORT(XLTEST,KKK,LORDER)
+        IF(XLTEST(1).LT.FLOAT(KINITIAL))THEN
+           DO I=1,NP
+             YSSS(I)=XMAT0(I,1)
+             LL(I)=L(I)
+           END DO
+           DO I=1,N
+             LLSAVE(I)=LL(KBIGPERM(LORDER(1),I)+KBEFORE)
+           END DO
+           DO I=1,N
+             LL(I+KBEFORE)=LLSAVE(I)
+           END DO
+!         IF(IPRINT.EQ.1)WRITE(11,103)IIJJ,KBEFORE,KINITIAL,LTEST(1), &
+!                      LORDER(1),(KBIGPERM(LORDER(1),JJ),JJ=1,N)
+           DO I=1,NP
+             XMAT0(LL(I),1)=YSS(I)
+!         WRITE(44,101)I,YSS(I),LL(I),L(I),MMSAVE(I,LORDER(1))
+           END DO
+           DO I=1,NP
+!         WRITE(44,104)I,XMAT0(I,1),YSSS(I)
+!         YSS(I)=XMAT0(I,1)
+!         YSSS(I)=XMAT0(I,1)
+!         L(I)=I
+!         LL(I)=I
+           END DO
+!
+!  RESET LERROR(. , .) AND KINITIAL
+!
+!         CALL KPRSORT(YSS,NP,LL)
+           KT=0
+           KTT=0
+           JCH=0
+           JEH=0
+           JCL=0
+           JEL=0
+           IVOT=0
+!
+!  ROLL CALL LOOP -- ESTIMATE BEST CUTTING POINT GIVEN FIXED LEGISLATOR
+!                    CONFIGURATION
+!
+           DO IIII=1,NV
+             IVOT=IVOT+1
+             KSUM=0
+             LSUM=0
+!
+!  RECODE AND COMPUTE YES AND NO MEANS
+!
+             DO J=1,NP
+               LV(J)=LDATA(J,IVOT)
+               IF(LV(J).EQ.1.OR.LV(J).EQ.2.OR.LV(J).EQ.3)KK=1
+               IF(LV(J).EQ.4.OR.LV(J).EQ.5.OR.LV(J).EQ.6)KK=6
+               IF(LV(J).EQ.0.OR.LV(J).EQ.7.OR.LV(J).EQ.8.OR.LV(J).EQ.9)KK=9
+               KKA(J)=KK
+               IF(KK.EQ.1)KSUM=KSUM+1
+               IF(KK.EQ.6)LSUM=LSUM+1
+             END DO
+             DO J=1,NP
+               KA(J)=KKA(LL(J))
+             END DO
+!
+!  CHECK FOR UNANIMOUS VOTES AND DISCARD THEM
+!
+             IF(KSUM.EQ.0.OR.LSUM.EQ.0)GO TO 601
+!
+!  BEGIN JANICE LOOP FOR ROLL CALLS
+!
+!  GET ONE POINT RESULTS
+!
+             JCH=0
+             JEH=0
+             JCL=0
+             JEL=0
+             KJAVA=0
+             DO JAVA=1,NP
+               IF(KA(JAVA).NE.9)THEN
+                 KJAVA=KJAVA+1
+                 YSJAVA(KJAVA)=YSS(JAVA)
+                 MMJAVA(KJAVA)=KA(JAVA)
+                 LJAVA(KJAVA)=LL(JAVA)
+               ENDIF
+             END DO
+             YSJAVA(KJAVA+1)=YSJAVA(KJAVA)+.01
+             MMJAVA(KJAVA+1)=9
+             LJAVA(KJAVA+1)=NP+1
+             NV1=KJAVA+1
+             IROTC=0
+             CALL JAN1PT(NUMMEMBERS,NUMVOTES,&
+                         NV1,NV,NP,NRCALL,NS,NDUAL,IVOT,XMAT,YSJAVA,MMJAVA, &
+                      WS,LLV,LLVB,LLE,LLEB,LERROR, &
+                      ZS,JCH,JEH,JCL,JEL,IROTC,KCUT,LCUT,LJAVA, &
+                      XJCH,XJEH,XJCL,XJEL)
+             KT=KT+JCH+JCL+JEH+JEL
+             KTT=KTT+JEH+JEL
+             KTOTC=KT
+             KCUTTER(IVOT)=KCUT
+             LCUTTER(IVOT)=LCUT
+!
+!  END OF ROLL CALL LOOP
+!
+ 601         CONTINUE
+           END DO
+!
+!
+           XT=FLOAT(KT)
+           XTT=FLOAT(KTT)
+           AB=1.0-(XTT/XT)
+           XSUM=FLOAT(MSUM)
+           XSUM=XSUM/XT
+           YSUM=AB-XSUM
+           PRE1=YSUM/(1.0-XSUM)
+!
+!  WRITE OUT: ITERATION #; NUMBER OF VOTES;
+!             TOTAL CHOICES; TOTAL ERROR CHOICES; PERCENT CORRECT;
+!             PERCENT MAJORITY MODEL; PROPORTIONAL REDUCTION IN ERROR
+!
+!        IF(IPRINT.EQ.1)WRITE(11,8250)KKK,NS,KTT,KT,1.0-AB,AB,PRE1
+           KKKCHK=0
+           DO IH=1,NRCALL
+             DO IG=1,NP
+               KKKCHK=KKKCHK+LERROR(IG,IH)
+             END DO
+           END DO
+!         IF(IPRINT.EQ.1)WRITE(11,8250)KKK,NS,KKKCHK
+        ENDIF
+!
+!  IF A BETTER SOLUTION IS **NOT** FOUND RESET LERROR(. , .)
+!
+        IF(XLTEST(1).GE.FLOAT(KINITIAL))THEN
+           DO J=1,NRCALL
+             DO I=1,NP
+               LERROR(I,J)=MERROR(I,J)
+             END DO
+           END DO
+!         IF(IPRINT.EQ.1)WRITE(11,105)IIJJ,KBEFORE,KINITIAL
+        ENDIF
+!
+        KBEFORE=KBEFORE+1
+      END DO
+!
+      DEALLOCATE(KPERM)
+      DEALLOCATE(MPERM)
+      DEALLOCATE(KBIGPERM)
+      DEALLOCATE(MMJAVA)
+      DEALLOCATE(LLV)
+      DEALLOCATE(LLVB)
+      DEALLOCATE(LLE)
+      DEALLOCATE(LLEB)
+      DEALLOCATE(L)
+      DEALLOCATE(LL)
+      DEALLOCATE(LJAVA)
+      DEALLOCATE(LV)
+      DEALLOCATE(KKA)
+      DEALLOCATE(KA)
+      DEALLOCATE(LLSAVE)
+      DEALLOCATE(LTEST)
+      DEALLOCATE(XLTEST)
+      DEALLOCATE(LORDER)
+      DEALLOCATE(MERROR)
+      DEALLOCATE(MMSAVE)
+      DEALLOCATE(YSS)
+      DEALLOCATE(YSJAVA)
+      DEALLOCATE(ZS)
+      DEALLOCATE(YSSS)
+      DEALLOCATE(XJCH)
+      DEALLOCATE(XJEH)
+      DEALLOCATE(XJCL)
+      DEALLOCATE(XJEL)
+      RETURN
+      END

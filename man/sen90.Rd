@@ -54,8 +54,8 @@ data(sen90)
 }
 
 \source{
-  Keith Poole. 2005. \emph{90th Senate Roll Call Vote Data}.
-  \url{http://www.voteview.com/}.
+  Voteview team. 2017. \emph{90th Senate Roll Call Vote Data}.
+  \url{https://voteview.com/static/data/out/votes/S090_votes.ord}.
 }
 
 \author{ 
@@ -74,13 +74,16 @@ Royce Carroll \email{rcarroll@rice.edu}
 
 \examples{
     #This data file is the same as reading file using:
-    #sen90 <- readKH("ftp://voteview.com/sen90kh.ord")
-    #All ORD files can be found on www.voteview.com
+    \dontrun{
+    sen90 <- readKH("https://voteview.com/static/data/out/votes/S090_votes.ord")
+	}
     data(sen90)
     summary(sen90)
 
     #Output file identical to one produced by command below
-    #sen90oc <-oc(sen90,dims=2,polarity=c(7,2))
+    \dontrun{
+    sen90oc <- oc(sen90,dims=2,polarity=c(7,2))
+	}
     data(sen90oc)
     summary(sen90oc)
     plot(sen90oc)

@@ -23,8 +23,12 @@
 	* Used a saved sen90oc file to reduce runtime on test examples
 
 0.96  * Maintainer changed from jameslo@princeton.edu to lojames@usc.edu
-	  * Period removed from title
-	  * importFrom() and S3 statements added to NAMESPACE
+	* Period removed from title
+	* importFrom() and S3 statements added to NAMESPACE
 
-
-
+0.98	* Overhauled underlying FORTRAN code to be F95 compiliant	
+	* added oc_init.c
+	* Lower case for "Optimal Classification" in description
+	* \dontrun{} used for examples
+	* doi added to DESCRIPTION
+	

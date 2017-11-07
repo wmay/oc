@@ -41,9 +41,10 @@ Royce Carroll \email{rcarroll@rice.edu}
 
 \examples{
     #This data file is the same as that obtained using:
-    #data(sen90)
-    #sen90oc<-oc(sen90,dims=2,polarity=c(7,2)) 
-
+    \dontrun{
+    data(sen90)
+    sen90oc <- oc(sen90,dims=2,polarity=c(7,2)) 
+	}
     data(sen90oc)
     summary(sen90oc)
     plot.OCskree(sen90oc)

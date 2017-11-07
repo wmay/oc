@@ -106,13 +106,17 @@ Keith Poole. \url{ http://voteview.com/ }
 
 \examples{
     #This data file is the same as reading file using:
-    #sen90 <- readKH("ftp://voteview.com/sen90kh.ord")
+    \dontrun{
+    sen90 <- readKH("ftp://voteview.com/sen90kh.ord")
+    }
     #All ORD files can be found on www.voteview.com
     data(sen90)
     summary(sen90)
 
     #Output file identical to one produced by command below
-    #sen90oc <-oc(sen90,dims=2,polarity=c(7,2))
+    \dontrun{
+    sen90oc <- oc(sen90,dims=2,polarity=c(7,2))
+    }
     data(sen90oc)
     summary(sen90oc)
     plot(sen90oc) 
