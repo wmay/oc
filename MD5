@@ -1,5 +1,5 @@
-b7d7d90423ec0597d44086bbce75e629 *ChangeLog
-1e76a26e5db70753d49634099cfb8921 *DESCRIPTION
+f8f71cf95de77fc4938975b29a02c6b5 *ChangeLog
+ef71e1ae20e5e4fdf306ab75a5740207 *DESCRIPTION
 b8176b6dcf6af7ec56432a862279da79 *NAMESPACE
 5af1f4d18f4ef21bcfc06138e24fd7cd *R/header.R
 ffa0c1176b3ad9c5634aa86a24f2bb5a *R/methods.R
@@ -11,9 +11,9 @@ ecad292d1a39fec6314348c0bba23c81 *data/UN.rda
 fbd018ae9b812595ce823ece8c81e639 *data/sen90oc.rda
 7e17e94bb7d75d4874850f127106e197 *inst/doc/oc.R
 216c9f8d7d8772f4176decf484a01521 *inst/doc/oc.Rnw
-4618d60e82a1ab7bff78f3029b6f2459 *inst/doc/oc.pdf
+301519a23c6a19aa94a087d269073ec0 *inst/doc/oc.pdf
 43275df2be3bf5571b359d2d28a1b9b5 *man/UN.Rd
-8747c164d44476d54169512e90750297 *man/oc.Rd
+079af1bac45f5f17518589ae8f6fb043 *man/oc.Rd
 11042b2ccbf7a665d1e3efc468993c8d *man/plot.OCangles.Rd
 286967400a7ff2f7ca4eb7e42d10a724 *man/plot.OCcoords.Rd
 6f4f276b452b4bfe4690d1a01f05ce24 *man/plot.OCcutlines.Rd
@@ -22,10 +22,10 @@ fbd018ae9b812595ce823ece8c81e639 *data/sen90oc.rda
 9ecc0612da9d7d009f3c0c8524efcb1c *man/sen90.Rd
 30a8f97dd8183e6812ec7ead4ef0225d *man/sen90oc.Rd
 577868e83e733b31d9273a837c840fe8 *man/summary.OCobject.Rd
-71db8ccc2e7c6c119e2b29a2cc15771c *src/Makevars
-9cab559335379051283f0a2e59016c64 *src/Makevars.win
+2a6f9e9e044a78154d3cfda5936d6f48 *src/Makevars
+72568bd5c4997964e95478cd0fd12ef2 *src/Makevars.win
 7fa5bb97f680f6962c6a0f261e3f9854 *src/nomprob.c
-cb16bed0dc15409d41f7767b7d701fd3 *src/oc.f95
+3b8cd560516fd8ae7cdb2a1f7d992781 *src/oc.f95
 42b44f24c44840623a28c04226de1a07 *src/oc_init.c
 460790fc7aa304e7aa7178117bab6b60 *src/ocwrap.c
 216c9f8d7d8772f4176decf484a01521 *vignettes/oc.Rnw

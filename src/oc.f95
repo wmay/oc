@@ -126,8 +126,10 @@
 !
 !  UN-TRANSPOSED CODE
 !
-      DO J=1,NUMVOTES
+      DO J=1,NUMVOTES*DIMS
         NORMALVECTORS(J)=0.0
+      END DO
+      DO J=1,NUMVOTES
         DO I=1,NUMMEMBERS
           LDATA(I,J)=VOTES(I+(J-1)*NUMMEMBERS)
           LERROR(I,J)=0
@@ -216,9 +218,6 @@
 !
 !  INCREMENT COUNTERS
 !
-!         IF(IPRINT.EQ.1)WRITE(11,1006)IMMM,NPKADD,KADD, &
-!                       KADD+NPKADD,FV1(1),FV1(2)
-! 1006    FORMAT(' DECOMPOSITION ',I3,3I7,2F8.4)
            KADD=KADD+NPKADD2
          END DO
       ENDIF
@@ -250,8 +249,10 @@
 !  PERFORM METRIC SCALING TO INCREASE PRECISION OF STARTING COORDINATES
 !
       IF(NP.LT.1500)THEN
-         CALL KPWHOOPE(NUMMEMBERS,NPMAX,NP,NS,DSTAR,XXX,XDATA,&
+         IF(NS.GT.1)THEN
+            CALL KPWHOOPE(NUMMEMBERS,NPMAX,NP,NS,DSTAR,XXX,XDATA,&
                        SSE1,SSE2,KTP,IPRINT)
+         ENDIF
       ENDIF
       DO K=1,NS
         SUM=0.0
@@ -298,8 +299,6 @@
 !  WRITE OUT METRIC SCALING COORDINATES USED AS STARTS
 !
       DO I=1,NP
-!      IF(IPRINT.EQ.1)WRITE(23,1914)I,(XDATA(I,JKJ),JKJ=1,NS)
-! 1914 FORMAT(I7,2F12.6)
         DO K=1,NS
           XMAT0(I,K)=XDATA(I,K)
         END DO
@@ -322,7 +321,11 @@
         ENDIF
         XONE(I)=XMAT0(I,1)
         XDATA(I,1)=XMAT0(I,1)
-        IF(NS.GT.1)XDATA(I,2)=XMAT0(I,2)
+        IF(NS.GT.1)THEN
+           DO K=1,NS           
+              XDATA(I,K)=XMAT0(I,K)
+           END DO
+        ENDIF
       END DO
 !
 !  INITIALIZE NORMAL VECTORS TO SQRT(1/S)
@@ -371,8 +374,6 @@
       AB=FLOAT(NP)*CSUM-ASUM*ASUM
       AC=FLOAT(NP)*DSUM-BSUM*BSUM
       RSQR=(AA*AA)/(AB*AC)
-!      IF(IPRINT.EQ.1)WRITE(23,1098)RSQR
-!      IF(IPRINT.EQ.1)WRITE(*,1098)RSQR
 !
       IF(NS.EQ.1)THEN
 !
@@ -387,7 +388,7 @@
          NNPERM=2
          CALL KPSHARPEN(NUMMEMBERS,NUMVOTES,&
                         NNPERM,NP,NRCALL,NS,NDUAL,KCUTTER,LCUTTER, &
-                       XMAT0,ZPT,WS,LDATA,LERROR,IPRINT)
+                        XMAT0,ZPT,WS,LDATA,LERROR,IPRINT)
       CALL ECHOEVENT(16)
       CALL FLUSHCON()
       CALL PROCEVENT()
@@ -531,8 +532,9 @@
                 NSAVEI=I
              ENDIF
              ENDIF
- 812         CONTINUE
+ 812       CONTINUE
            END DO
+
 !
 !  TAKE CARE OF TIED RANKS/PRECISION PROBLEMS
 !
@@ -962,12 +964,7 @@
         END DO
  3      CONTINUE
       END DO
-!      IF(IPRINT.EQ.1)WRITE(23,1000)NRCALL,NRS,NAS,XVMIN
-! 1000 FORMAT(' ROLL-CALLS READ=',I4,2X,'NUMBER REJECTED=',I4,2X, &
-!      'NUMBER ACCEPTED=',I4,2X,'CUTOFF=',F6.3)
-!      IF(IPRINT.EQ.1)WRITE(23,1001)NP,NMOB,NOB,KVMIN
-! 1001 FORMAT(' LEGISLATORS READ=',I4,2X,'NUMBER REJECTED=',I4,2X, &
-!      'NUMBER ACCEPTED=',I4,2X,'CUTOFF=',I4)
+
       NRCALL=NAS
       NP=NOB
 !
@@ -1241,7 +1238,6 @@
       DAT(1)=SSE1
       II=0
       AKKK=0.0
-!      IF(IPRINT.EQ.1)WRITE(23,100)II,SSE1,RRSQ,AKKK,KK
       IF(SSE1.LE.0.001)SSE2=0.0
       IF(SSE1.LE.0.001) THEN
         DEALLOCATE(SAVEZ)
@@ -1265,8 +1261,8 @@
             SAVED(KK)=DSTAR(NPJ,JJ)
  918        CONTINUE
           END DO
-          IF(NS.EQ.1)CALL KPFOCUSW(NUMMEMBERS,NPMAX,NP,NPQ,NPJ,SAVED,&
-                                                             SAVEZ,ZZZ)
+!          IF(NS.EQ.1)CALL KPFOCUSW(NUMMEMBERS,NPMAX,NP,NPQ,NPJ,SAVED,&
+!                                                             SAVEZ,ZZZ)
           IF(NS.GT.1)CALL KPFOCUS(NUMMEMBERS,NPMAX,NP,NPQ,NS,NPJ,SAVED,&
                                                                XX,XXXX)
         END DO
@@ -1274,7 +1270,6 @@
         DAT(II+1)=SSE2
         IF(SSE2.EQ.0.0)GO TO 9998
         AKKK=(DAT(II)-DAT(II+1))/DAT(II)
-!      IF(IPRINT.EQ.1)WRITE(23,100)II,SSE2,RRSQ,AKKK,KK
         IF(AKKK.LE..001)GO TO 9998
       END DO
  9998 CONTINUE
@@ -1624,12 +1619,6 @@
       ALLOCATE(LCERROR(NP,NRCALL))
       ALLOCATE(ZS(NDUAL))
 !
-!  100 FORMAT(5I5)
-!  101 FORMAT(7I4,2F10.4)
-! 1010 FORMAT(' WHOA DUDE! THESE DO NOT MATCH!')
-! 1093 FORMAT(' CLASSIFICATION CHECK  ',I3,4I8)
-! 1094 FORMAT(' RC  CLASSIFICATION ERROR  ',2I3,2I8,2F10.5)
-! 1118 FORMAT(7I4,F7.3,3I4)
       CALL ECHOEVENT(11)
       CALL FLUSHCON()
       CALL PROCEVENT()
@@ -2417,7 +2406,7 @@
  5           LSV=LSV+1
              GO TO 3
  6           LSE=LSE+1
- 3           CONTINUE
+ 3         CONTINUE
            END DO
            KMARK=0
            GO TO 31
@@ -2766,7 +2755,6 @@
           END DO
           UL(I,K)=SUM
         END DO
-        UL(I,K)=SUM
       END DO
 !
 !
@@ -2783,19 +2771,17 @@
           IF(I.NE.J)ASUM=ASUM+ABS(SUM)
         END DO
       END DO
-!      IF(ASUM.GT..01.AND.IPRINT.EQ.1)WRITE(23,1091)ASUM
 !
 !  (X'X)-1*X'
 !
-      SUM=0.0
       DO I=1,NRCALL
         DO J=1,NS
+          SUM=0.0
           DO JJ=1,NS
             SUM=SUM+UL(J,JJ)*ZVEC(I,JJ)
           END DO
           BB(J,I)=SUM
         END DO
-        BB(J,I)=SUM
       END DO
 !
       DEALLOCATE(VVV)
@@ -3815,10 +3801,8 @@
       DO LM=1,100
         SUM=0.0
         DO K=1,NS
-!      TVEC(LM,K)=(URAND(ISEED)-.50)
           TVEC(LM,K)=(RNUNF()-.50)
 !      TVEC(LM,K)=(Rand()-.50)
-!      TVEC(LM,K)=0.6
           SUM=SUM+TVEC(LM,K)**2
         END DO
         DO K=1,NS
@@ -3944,10 +3928,8 @@
 !
         SUM=0.0
         DO K=1,NS
-!      ZZZ(K)=(URAND(ISEED)-.50)*0.4 + ZVEC(JX,K)
           ZZZ(K)=(RNUNF()-.50)*0.4 + ZVEC(JX,K)
 !      ZZZ(K)=(Rand()-.50)*0.4 + ZVEC(JX,K)
-!      ZZZ(K)=0.7*0.4 + ZVEC(JX,K)
           SUM=SUM+ZZZ(K)**2
         END DO
         SUM2=0.0
@@ -3959,7 +3941,6 @@
         SUM3=0.0
         DO K=1,NS
           ZVEC2(JX,K)=ZVEC(JX,K)+(XINC/SUM2)*(ZZZ(K)-ZVEC(JX,K))
-!      ZVEC2(JX,K)=(Rand()-.50)
           SUM3=SUM3+ZVEC2(JX,K)**2
         END DO
         DO K=1,NS
@@ -4206,15 +4187,14 @@
 !
 !  (X'X)-1*X'
 !
-      SUM=0.0
       DO I=1,NP
         DO J=1,NS
+          SUM=0.0
           DO JJ=1,NS
             SUM=SUM+UL(J,JJ)*XMAT(I,JJ)
           END DO
           BB(J,I)=SUM
         END DO
-        BB(J,I)=SUM
       END DO
 !
       DO JX=1,NRCALL

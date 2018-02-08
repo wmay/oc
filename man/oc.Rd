@@ -113,10 +113,13 @@ Keith Poole. \url{ http://voteview.com/ }
     data(sen90)
     summary(sen90)
 
+	#Small executable example
+	sen90.1d <- oc(sen90,dims=1,polarity=c(7))
+
     #Output file identical to one produced by command below
     \dontrun{
     sen90oc <- oc(sen90,dims=2,polarity=c(7,2))
-    }
+	}
     data(sen90oc)
     summary(sen90oc)
     plot(sen90oc) 

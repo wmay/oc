@@ -31,4 +31,9 @@
 	* Lower case for "Optimal Classification" in description
 	* \dontrun{} used for examples
 	* doi added to DESCRIPTION
+
+1.01    * Fortran source tidied and made F95 compliant.
+	* Fits of 3 or more dimensions now supported.
+	* Removed PKC_FLCFLAGS for compliance, per Brian Ripley
 	
+	* Added small executable example of oc() in Rd file, per Swetlana Herbrandt 
