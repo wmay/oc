@@ -36,4 +36,7 @@
 	* Fits of 3 or more dimensions now supported.
 	* Removed PKC_FLCFLAGS for compliance, per Brian Ripley
 	
-	* Added small executable example of oc() in Rd file, per Swetlana Herbrandt 
+	* Added small executable example of oc() in Rd file, per Swetlana Herbrandt
+
+1.2     * Fixed inconsequential type mismatch error in call to DGESDD
+	revealed by the move to Fortran 10.
