@@ -13,7 +13,6 @@ Authors@R: c(
            comment = c(ORCID = "0000-0002-3201-1885")),
     person("U.S. National Science Foundation", role = "fnd",
            comment = "NSF Grant SES-0611974"))
-Maintainer: William May <wmay@hey.com>
 Depends: R (>= 2.3.1), pscl (>= 0.59)
 Description: Estimates optimal classification (Poole 2000) <doi:10.1093/oxfordjournals.pan.a029814>
 		scores from roll call votes supplied though a 'rollcall'
