@@ -52,16 +52,20 @@ plot.OCangles <- function(x, main.title="Cutting Line Angles",
     cutvector1[cutvector2<0] <- -cutvector1[cutvector2<0]
     cutvector2[cutvector2<0] <- -cutvector2[cutvector2<0]
     angles <- atan2(cutvector2,cutvector1)*180/pi
-    
-    suppressWarnings(hist(angles, breaks=seq(0,180,10),
-        main=main.title,
-        xlab=x.title,
-        ylab=y.title,
-        cex.main=1.2,
-        cex.lab=1.2,
-        font.main=2,
-        at=seq(0,180,10)
-        ,...))
+
+    suppressWarnings({
+        hist(angles, breaks=seq(0,180,10),
+             main=main.title,
+             xlab=x.title,
+             ylab=y.title,
+             cex.main=1.2,
+             cex.lab=1.2,
+             font.main=2,
+             axes=FALSE
+             ,...)
+        graphics::axis(1, at=seq(0,180,10))
+        graphics::axis(2)
+    })
 }
 
 plot.OCcutlines <- function(x, main.title="Cutting Lines",
