@@ -1,11 +1,19 @@
 Package: oc
-Version: 1.2
-Date: 2020-07-04
+Version: 1.2.1
+Date: 2023-02-03
 Title: Optimal Classification Roll Call Analysis Software
-Author: Keith Poole <ktpoole@uga.edu>, Jeffrey Lewis
-        <jblewis@ucla.edu>, James Lo <lojames@usc.edu> and Royce
-        Carroll <rcarroll@rice.edu>
-Maintainer: James Lo <lojames@usc.edu>
+Authors@R: c(
+    person("Keith", "Poole", email = "ktpoole@uga.edu", role = "aut"),
+    person("Jeffrey", "Lewis", email ="jblewis@ucla.edu",role = "aut",
+           comment = c(ORCID = "0000-0003-2605-5010")),
+    person("James", "Lo", email = "lojames@usc.edu", role = "aut"),
+    person("Royce", "Carroll", email = "r.carroll@essex.ac.uk", role = "aut",
+           comment = c(ORCID = "0000-0002-3185-0329")),
+    person("William", "May", email = "wmay@hey.com", role = c("aut", "cre"),
+           comment = c(ORCID = "0000-0002-3201-1885")),
+    person("U.S. National Science Foundation", role = "fnd",
+           comment = "NSF Grant SES-0611974"))
+Maintainer: William May <wmay@hey.com>
 Depends: R (>= 2.3.1), pscl (>= 0.59)
 Description: Estimates optimal classification (Poole 2000) <doi:10.1093/oxfordjournals.pan.a029814>
 		scores from roll call votes supplied though a 'rollcall'
@@ -14,5 +22,3 @@ License: GPL-2
 Repository: CRAN
 NeedsCompilation: yes
 RoxygenNote: 6.0.1
-Packaged: 2020-07-04 16:08:07 UTC; ubuntu
-Date/Publication: 2020-07-13 15:50:03 UTC
