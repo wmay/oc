@@ -18,7 +18,7 @@ Description: Estimates optimal classification (Poole 2000) <doi:10.1093/oxfordjo
 		scores from roll call votes supplied though a 'rollcall'
 		object from package 'pscl'.
 License: GPL-2
-URL: https://github.com/wmay/oc
+URL: https://legacy.voteview.com/oc_in_R.htm, https://github.com/wmay/oc
 BugReports: https://github.com/wmay/oc/issues
 Repository: CRAN
 NeedsCompilation: yes
