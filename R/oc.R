@@ -40,7 +40,7 @@ oc <- function(rcObject, dims=2, minvotes=20, lop=0.025, polarity, verbose=FALSE
     }
     
     #Core Error Checking
-    if(!class(rcObject)=="rollcall")
+    if(!inherits(rcObject, "rollcall"))
         stop("Input is not of class 'rollcall'.")
 
     if(dims>10) stop("'dims' cannot exceed 10\n") 
