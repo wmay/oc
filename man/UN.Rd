@@ -7,10 +7,10 @@
 
 \description{
   This data frame contains votes from the first three sessions of the
-  United Nations.  The same data can also be downloaded as a CSV file from 
-  www.voteview.com.  The object of this data set is to provide an example
-  of how one might use the W-NOMINATE package on a set of roll call votes
-  not already stored in ORD format.
+  United Nations.  The same data can also be downloaded as a CSV file
+  from https://legacy.voteview.com/.  The object of this data set is to
+  provide an example of how one might use the W-NOMINATE package on a
+  set of roll call votes not already stored in ORD format.
 }
 
 \usage{
@@ -66,7 +66,7 @@ rc <- rollcall(UN, yea=c(1,2,3), nay=c(4,5,6),
 missing=c(7,8,9),notInLegis=0, legis.names=UNnames,
 legis.data=legData,
 desc="UN Votes",
-source="www.voteview.com")
+source="legacy.voteview.com")
 
 # Not Run
 \dontrun{

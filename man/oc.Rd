@@ -96,7 +96,7 @@ Analysis, 8(3):211-237
 Keith Poole. 2005. 'Spatial Models of Parliamentary Voting.' Cambridge:
 Cambridge University Press.
 
-Keith Poole. \url{ http://voteview.com/ }
+Keith Poole. \url{ https://legacy.voteview.com/ }
 
 }
 
@@ -107,9 +107,9 @@ Keith Poole. \url{ http://voteview.com/ }
 \examples{
     #This data file is the same as reading file using:
     \dontrun{
-    sen90 <- readKH("ftp://voteview.com/sen90kh.ord")
+    sen90 <- readKH("https://voteview.com/static/data/out/votes/S090_votes.ord")
     }
-    #All ORD files can be found on www.voteview.com
+    #All ORD files can be found on voteview.com
     data(sen90)
     summary(sen90)
 

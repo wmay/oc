@@ -216,9 +216,8 @@ are likely to fall into.  Roll call votes in a fixed width format
 download at:
 
 \begin{itemize}
-\item \emph{http://www.voteview.com/} \item
-\emph{http://www.polisci.ucla.edu/faculty/lewis/rollcall/} (latest Congress
-only, updates votes in real time)
+\item \emph{https://legacy.voteview.com/} \item
+\emph{https://voteview.com} (updates votes in real time)
 \end{itemize}
 
 \verb@oc@ takes \verb@rollcall@ objects from Simon Jackman's
@@ -232,7 +231,7 @@ the data in R as follows:\\
 
 <<one>>=
 library(oc)
-#sen90 <- readKH("ftp://voteview.com/sen90kh.ord")
+#sen90 <- readKH("https://voteview.com/static/data/out/votes/S090_votes.ord")
 data(sen90)     #Does same thing as above
 sen90
 @
@@ -241,7 +240,7 @@ To make this example more interesting, suppose we were interested
 in applying \emph{oc()} only to bills that pertained in some
 way to agriculture.  Keith Poole and Howard Rosenthal's VOTEVIEW software allows us to
 quickly determine which bills in the 90th Senate pertain to
-agriculture.\footnote{VOTEVIEW for Windows can be downloaded at \emph{www.voteview.com}.}
+agriculture.\footnote{VOTEVIEW for Windows can be downloaded at \emph{legacy.voteview.com}.}
 Using this information, we create a vector of roll calls that we wish
 to select, then select for them in the \verb@rollcall@ object.  In doing
 so, we should also take care to update the variable in the \verb@rollcall@
@@ -384,7 +383,7 @@ The \verb@oc@ package includes all three of these items for
 the United Nations, which can be loaded and browsed with the code 
 shown below.  The data comes from Eric Voeten at George Washington University. 
 In practice, one would prepare a roll call data set in a spreadsheet, like the
-one available one \emph{www.voteview.com/UN.csv}, and read it into R using \emph{read.csv()}.
+one available one \emph{legacy.voteview.com/k7ftp/dtaord/UN.csv}, and read it into R using \emph{read.csv()}.
 The csv file is also stored in this package and can be read using:\\
 
 \noindent 
@@ -436,7 +435,7 @@ rc <- rollcall(UN, yea=c(1,2,3), nay=c(4,5,6),
 missing=c(7,8,9),notInLegis=0, legis.names=UNnames,
 legis.data=legData,
 desc="UN Votes",
-source="www.voteview.com")
+source="legacy.voteview.com")
 result<-oc(rc,polarity=1,dims=1)
 @
 
