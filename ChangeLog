@@ -40,3 +40,6 @@
 
 1.2     * Fixed inconsequential type mismatch error in call to DGESDD
 	revealed by the move to Fortran 10.
+
+1.2.1	* Fix plot.OCangles bug in R >=4.2.
+	* Change maintainer from James Lo to William May.
